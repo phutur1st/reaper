@@ -151,7 +151,7 @@ export const deletionSafety: Doc = {
     ),
     callout(
       "caution",
-      "**The countdown is the time your users have to catch it.** Once it ends, the title is ready for your next review, but you still start every deletion by hand. Watch it or spare it to keep a title.",
+      "**Grace is a notice by default.** Enable Wait for grace before deleting under Policy, Pace and limits to make it a deletion hold, including hand reaps and seasons. Missing clocks keep the file. Existing countdowns retain their start dates. Every deletion still needs your approval, and every other safety check still applies.",
     ),
 
     h2("Sharp edges", "edges"),
