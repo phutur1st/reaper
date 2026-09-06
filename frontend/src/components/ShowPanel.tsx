@@ -15,7 +15,8 @@ import { itemBytes, totalBytes } from "../format";
 import { cardReason } from "../why";
 import { useOverrideMutations } from "../useOverrideMutations";
 import { LibraryChip, OverrideControls, ShowStatusChip } from "./ReviewQueue";
-import { handFate, laneOf, showReapIsNoop } from "./reviewFate";
+import { GraceBadge, GraceSummary, useGraceNow } from "./GraceBadge";
+import { displayFate, graceHeld, laneOf, showReapIsNoop } from "./reviewFate";
 import { chipWhy, CondemnedChip, OverrideChip, StatusChip } from "./StatusChip";
 import { MatchCandidates, PanelHead, Synopsis, WhyHero } from "./WhyPanel";
 import { WhyShell } from "./WhyShell";
@@ -30,13 +31,15 @@ function SeasonPill({ season }: { season: Candidate }) {
       <OverrideChip
         override={season.override}
         effective={season.override_effective}
+        graceHeld={graceHeld(season)}
+        graceTracked={season.grace_enforced != null}
         keptWhy={chipWhy(season.chip)}
         spareCoversUntil={season.spare_covers_until}
         family="status-chip"
       />
     );
   }
-  if (season.verdict === "condemn") return <CondemnedChip />;
+  if (season.verdict === "condemn") return <CondemnedChip marked={season.grace_enforced != null} />;
   return <StatusChip chip={season.chip} />;
 }
 
@@ -59,6 +62,7 @@ export function ShowPanel({
   // aggregate of the seasons' own marks. Clearing this key cannot clear those, so lighting
   // it from them would be a dead toggle. A season overridden on its own keeps its mark in
   // the strip and its row.
+  useGraceNow();
   const { t } = useTranslation();
   const { setOverride, clearOverride } = useOverrideMutations();
   const showOverride = group.show_override;
@@ -93,6 +97,7 @@ export function ShowPanel({
       {group.summary && <Synopsis text={group.summary} />}
 
       <StatusChip chip={group.chip} />
+      <GraceSummary seasons={group.seasons} />
       {/* The full sentence behind the chip: a keep-rule conflict's complete wording, or
           whatever line put this show in front of you. */}
       {reason && <p className="show-reason">{reason}</p>}
@@ -114,7 +119,7 @@ export function ShowPanel({
                 className="panel-season"
                 onClick={() => onOpenSeason(season.id, laneOf(season))}
               >
-                <span className={`score score-${handFate(season)}`}>{season.score}</span>
+                <span className={`score score-${displayFate(season)}`}>{season.score}</span>
                 {/* Two of these three branches are labels the panel composes, short enough
                     that the row's nowrap costs them nothing. The third is the server's own
                     title, and it is the only one that needs a break opportunity, so it
@@ -134,6 +139,7 @@ export function ShowPanel({
                 <SeasonPill season={season} />
                 <span className="panel-season-size num">{itemBytes(season.size_bytes)}</span>
               </button>
+              <GraceBadge item={season} exact />
             </li>
           ))}
         </ul>

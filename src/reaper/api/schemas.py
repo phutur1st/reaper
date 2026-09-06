@@ -178,6 +178,10 @@ class GroupSeasonMarkOut(BaseModel):
     shows it unnumbered instead of dropping it. Display extraction never errors a row off
     the queue."""
 
+    grace_enforced: bool | None = None
+    """Live grace mode. None means the stored settings could not be read."""
+    grace_ends_at: str | None = None
+    """UTC deadline from the deletion gate's clock, or None when unavailable."""
     id: int
     """The candidate id for this season, so clicking its square opens that season's own
     reasoning (not the whole show's panel)."""
@@ -209,6 +213,10 @@ class GroupSeasonMarkOut(BaseModel):
 
 
 class CandidateOut(BaseModel):
+    grace_enforced: bool | None = None
+    """Live grace mode. None means the stored settings could not be read."""
+    grace_ends_at: str | None = None
+    """UTC deadline from the deletion gate's clock, or None when unavailable."""
     id: int
     media_key: str
     title: str

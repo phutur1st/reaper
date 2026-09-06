@@ -1174,5 +1174,11 @@
   "error.plan.grace_waiting": "Plan refusal when a requested title or season has not completed its enforced grace window.",
   "error.reap.step.grace_waiting": "Per-item execution refusal. No deletion is sent.",
   "reapPlan.breakdown.graceWaiting": "n is the count of movies and individual seasons held by the grace gate, including missing clocks.",
-  "reapPlan.breakdown.graceDate": "date and time are the same UTC deadline formatted in the browser locale and time zone. Other deletion checks still apply."
+  "reapPlan.breakdown.graceDate": "date and time are the same UTC deadline formatted in the browser locale and time zone. Other deletion checks still apply.",
+  "reviewGrace.deadline": "date and time format the same UTC deadline in the browser locale and time zone. Completing grace does not authorize deletion.",
+  "reviewGrace.grace.days": "n is the rounded-up count of remaining 24-hour days. Under one day uses separate copy, never zero before expiry.",
+  "reviewGrace.notice.days": "n is the rounded-up count of remaining notice days. A notice does not prevent deletion.",
+  "reviewGrace.grace.summary": "n counts seasons held by grace, including missing clocks. complete counts condemned seasons whose grace ended.",
+  "reviewGrace.notice.summary": "n counts condemned seasons with an unfinished or missing notice countdown. complete counts ended notices. No deletion hold is implied.",
+  "reviewGrace.markedOfTotal": "n is the count of condemned seasons, total is all seasons, size is formatted disk space. This is the review decision before grace and other deletion checks."
 }

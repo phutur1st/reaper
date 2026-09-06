@@ -74,7 +74,9 @@ from reaper.services.condemned import (
 )
 from reaper.services.deep_links import build_links
 from reaper.services.display_meta import parse_ratings_json
+from reaper.services.grace import grace_deadline
 from reaper.services.planner import MediaRef, PlanError
+from reaper.services.profiles import ActiveProfile, active_profile
 
 log = structlog.get_logger(__name__)
 
@@ -636,6 +638,7 @@ async def list_candidates(
             .all()
         }
         expiries = await whitelist.spare_expiries(session)
+        grace_profile = await active_profile(session)
         group_keys = {r.group_key for r in rows if r.group_key}
         group_totals, group_marks = await _group_rollups(
             session, snapshot.id, group_keys, decisions, expiries
@@ -650,6 +653,7 @@ async def list_candidates(
                     expiries=expiries,
                     search_rank=ranks.get(r.media_key),
                     matched_collection=matched_names.get(r.media_key),
+                    grace_profile=grace_profile,
                 )
                 for r in rows
             ],
@@ -729,6 +733,7 @@ async def _group_rollups(
     # the frozen explanation, fetched in one targeted pass below rather than dragging
     # every member's JSON through the rollup query. media_key -> (mark, group, bytes).
     pending: dict[str, tuple[GroupSeasonMarkOut, str, int | None]] = {}
+    grace_profile = await active_profile(session)
     keys = sorted(group_keys)
     for start in range(0, len(keys), KEY_CHUNK):
         chunk = keys[start : start + KEY_CHUNK]
@@ -740,13 +745,16 @@ async def _group_rollups(
                     Candidate.group_key,
                     Candidate.size_bytes,
                     Candidate.verdict,
-                ).where(
+                    FirstFlagged.first_flagged_at,
+                )
+                .outerjoin(FirstFlagged, FirstFlagged.media_key == Candidate.media_key)
+                .where(
                     Candidate.snapshot_id == snapshot_id,
                     Candidate.group_key.in_(chunk),
                 )
             )
         ).all()
-        for candidate_id, media_key, group_key, size_bytes, verdict in members:
+        for candidate_id, media_key, group_key, size_bytes, verdict, flagged_at in members:
             override = whitelist.effective_override(media_key, decisions)
             # The spare in effect on this season, matching `override` above: its own if it
             # has one, else its show's. Read only alongside a "spare" decision, exactly as
@@ -756,7 +764,10 @@ async def _group_rollups(
                 if override == "spare"
                 else None
             )
+            grace_mode, grace_end = _review_grace(flagged_at, grace_profile)
             mark = GroupSeasonMarkOut(
+                grace_enforced=grace_mode,
+                grace_ends_at=grace_end,
                 id=int(candidate_id),
                 season=_season_number(media_key),
                 verdict=str(verdict),
@@ -1340,6 +1351,15 @@ def _covers_until(
     return covers.isoformat() if covers is not None else None
 
 
+def _review_grace(
+    started: datetime | None, profile: ActiveProfile | None
+) -> tuple[bool | None, str | None]:
+    if profile is None or profile.repaired:
+        return None, None
+    end = grace_deadline(started, profile.settings.grace_days)
+    return profile.settings.enforce_grace_period, end.isoformat() if end is not None else None
+
+
 def _candidate_out(
     r: Candidate,
     flagged_at: datetime | None = None,
@@ -1348,6 +1368,7 @@ def _candidate_out(
     expiries: dict[str, datetime | None] | None = None,
     search_rank: int | None = None,
     matched_collection: str | None = None,
+    grace_profile: ActiveProfile | None = None,
 ) -> CandidateOut:
     # Three views of the one whitelist. The decision in effect (own, or inherited from the
     # show) colors the row. The item's own decision is what a control on this row can toggle.
@@ -1375,7 +1396,10 @@ def _candidate_out(
     dormant_days = _dormant_days(explanation)
     primary_reason = _primary_reason(explanation, r.verdict, r.score, r.media_type)
     reason_key = to_wire(primary_reason) if primary_reason is not None else None
+    grace_mode, grace_end = _review_grace(flagged_at, grace_profile)
     return CandidateOut(
+        grace_enforced=grace_mode,
+        grace_ends_at=grace_end,
         id=r.id,
         media_key=r.media_key,
         title=r.title,
@@ -1567,12 +1591,14 @@ async def candidate_detail(request: Request, candidate_id: int) -> CandidateDeta
         flagged = await session.get(FirstFlagged, row.media_key)
         decisions = await whitelist.overrides(session)
         expiries = await whitelist.spare_expiries(session)
+        grace_profile = await active_profile(session)
 
         base = _candidate_out(
             row,
             flagged.first_flagged_at if flagged else None,
             decisions,
             expiries=expiries,
+            grace_profile=grace_profile,
         )
         explanation = _explanation_out(row)
         return CandidateDetail(
@@ -1628,6 +1654,7 @@ async def group_detail(request: Request, group_key: str) -> GroupOut:
         }
         decisions = await whitelist.overrides(session)
         expiries = await whitelist.spare_expiries(session)
+        grace_profile = await active_profile(session)
 
         seasons = [
             _candidate_out(
@@ -1635,6 +1662,7 @@ async def group_detail(request: Request, group_key: str) -> GroupOut:
                 flagged.get(r.media_key),
                 decisions,
                 expiries=expiries,
+                grace_profile=grace_profile,
             )
             for r in rows
         ]

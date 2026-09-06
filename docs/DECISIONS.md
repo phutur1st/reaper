@@ -472,7 +472,9 @@ The original notice-only behavior remains the default for compatibility. Enablin
 `enforce_grace_period` requires an existing FirstFlagged clock whose start plus grace_days
 has passed. Missing clocks hold the item. The shared deletion_eligibility partition is used
 by planning, run counts, confirmation and execution. The executor checks settings and clocks
-again per item. Waiting titles remain condemned and visible on Leaving Soon.
+again per item. Review rows, season strips, and detail panels read deadlines from the same
+calculation. Countdown display never changes queue membership or a stored hand decision.
+Waiting titles remain condemned and visible on Leaving Soon.
 
 This applies to hand reaps and individual seasons too. An explicit selection containing a
 waiting title refuses instead of silently shrinking; bulk planning omits waiting titles.
