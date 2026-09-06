@@ -40,7 +40,7 @@ name: CI
 # design, because the image really was built from that code.
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, preview/grace-gate]
   pull_request:
 
 # The default for every job here: read the tree, touch nothing else. The one job
