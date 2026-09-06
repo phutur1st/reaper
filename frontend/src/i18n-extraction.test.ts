@@ -88,6 +88,7 @@ const CONVERTED = [
   "components/ShowPanel.tsx",
   "components/StaleReadNotice.tsx",
   "components/StatusChip.tsx",
+  "components/GraceBadge.tsx",
   "components/SwitchConfirm.tsx",
   "components/TagsEditor.tsx",
   "components/UnmatchedList.tsx",
