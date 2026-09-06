@@ -20,6 +20,8 @@
 // It also renders for protected items, showing the score it is overriding. A tool that
 // only explains its deletions cannot be trusted about its keeps.
 
+import { graceHeld } from "./reviewFate";
+import { GraceBadge, useGraceNow } from "./GraceBadge";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, type RefObject, useId, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -631,6 +633,9 @@ function spareNote(item: CandidateDetail): string {
  *  shipped, which a rescan resolves. It reads as left-for-you, not protected). */
 function verdictLook(item: CandidateDetail): { klass: string; label: string; note: ReactNode } {
   const { verdict, override, override_effective, explanation } = item;
+  if (graceHeld(item)) {
+    return { klass: "verdict-held", label: i18next.t("reviewGrace.marked"), note: null };
+  }
 
   if (override === "reap") {
     if (override_effective) {
@@ -1315,6 +1320,7 @@ export function WhyPanel({
    *  all of them. A name absent from the map renders no number, never a "0". */
   collectionSizes?: Record<string, number> | null;
 }) {
+  useGraceNow();
   const { t } = useTranslation();
   const { explanation } = item;
 
@@ -1401,6 +1407,7 @@ export function WhyPanel({
       />
 
       <MetaLine item={item} />
+      <GraceBadge item={item} exact />
       <RatingsRow ratings={item.ratings} links={item.links} />
 
       {item.summary && <Synopsis text={item.summary} />}
@@ -1588,7 +1595,7 @@ export function WhyPanel({
         <KeptByShowNote
           own={item.override_own}
           showOverride={item.show_override}
-          effective={item.override_effective}
+          effective={graceHeld(item) ? false : item.override_effective}
         />
         <div className="why-actions-row">
           <OverrideControls

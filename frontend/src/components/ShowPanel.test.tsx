@@ -270,3 +270,23 @@ describe("the show panel's season names", () => {
     for (const name of names) expect(name).not.toHaveClass("is-server-title");
   });
 });
+
+it("shows the grace hold and exact deadline for a hand-reaped season without changing its lane", () => {
+  const fixedClock = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-01-20T12:00:00Z"));
+  const waiting = {
+    ...season(1, "condemn"),
+    override: "reap" as const,
+    override_effective: true,
+    grace_enforced: true,
+    grace_ends_at: "2026-01-25T12:00:00Z",
+  };
+  const open = vi.fn();
+  try {
+    renderPanel(group([waiting]), open);
+    expect(screen.getByText("Marked to reap by hand")).toHaveClass("status-reap-held");
+    expect(screen.getByText(/Countdown ends/)).toBeInTheDocument();
+    expect(screen.getByText("1 season waiting for grace, 0 grace complete")).toBeInTheDocument();
+  } finally {
+    fixedClock.mockRestore();
+  }
+});

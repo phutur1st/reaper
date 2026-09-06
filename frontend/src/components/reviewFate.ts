@@ -208,3 +208,31 @@ export function showReapIsNoop(
   if (seasons.some((s) => s.override === "reap")) return false;
   return seasons.every((s) => s.verdict === "condemn" && s.override !== "spare");
 }
+
+/** Grace changes the display, never the review lane or the owner's stored decision. */
+export function graceHeld(
+  item: {
+    verdict: Verdict;
+    override: Override | null;
+    override_effective: boolean | null;
+    grace_enforced?: boolean | null;
+    grace_ends_at?: string | null;
+  },
+  now = Date.now(),
+): boolean {
+  if (laneOf(item) !== "condemn" || item.grace_enforced === false) return false;
+  // Older responses omit the field; explicit null means the server could not read pace.
+  if (item.grace_enforced === undefined) return false;
+  if (item.grace_enforced === null || !item.grace_ends_at) return true;
+  const end = Date.parse(item.grace_ends_at);
+  return !Number.isFinite(end) || now < end;
+}
+
+export function displayFate(
+  item: Parameters<typeof handFate>[0] & {
+    grace_enforced?: boolean | null;
+    grace_ends_at?: string | null;
+  },
+): Fate {
+  return item.override === "reap" && graceHeld(item) ? "refused" : handFate(item);
+}

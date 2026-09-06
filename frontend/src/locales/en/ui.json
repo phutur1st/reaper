@@ -3271,5 +3271,27 @@
     "scanLine": {
       "scanningLabel": "Scanning your library"
     }
+  },
+  "reviewGrace": {
+    "unavailable": "Grace status unavailable, check Pace and limits.",
+    "marked": "Marked for removal",
+    "handMarked": "Marked to reap by hand",
+    "deadline": "Countdown ends {date}, {time}. Approval and other deletion checks still apply.",
+    "grace": {
+      "days": "Grace: {n, plural, one {# day left} other {# days left}}",
+      "soon": "Grace: less than 1 day left",
+      "complete": "Grace complete",
+      "missing": "Countdown missing, held",
+      "summary": "{n, plural, =0 {No seasons waiting for grace} one {# season waiting for grace} other {# seasons waiting for grace}}, {complete} grace complete"
+    },
+    "notice": {
+      "days": "Notice: {n, plural, one {# day left} other {# days left}}",
+      "soon": "Notice: less than 1 day left",
+      "complete": "Notice complete",
+      "missing": "Notice countdown missing",
+      "summary": "{n, plural, one {# season notice pending} other {# season notices pending}}, {complete} complete"
+    },
+    "markedOfTotal": "{n} of {total} marked for removal, {size}",
+    "queueIncludesWaiting": "Marked for removal, including titles waiting for grace."
   }
 }
