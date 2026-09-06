@@ -4,14 +4,10 @@
 A condemned item sits in a grace window of ``grace_days``, during which it can be spared by
 hand, rescued by anyone watching it, or simply reconsidered when the next scan re-judges it.
 
-**The window is a notice, not a gate.** Nothing on the deletion path reads it: neither
-``services.planner`` nor ``services.executor`` imports this module, and ``leaving_soon`` is
-its only consumer. An unexpired window does not stop a send. What actually keeps a file at
-send time is the executor's own live interlocks, re-checked per item
-(``Executor._being_watched_now`` and ``Executor._watched_since_approval``, both called in
-``_one_delete``), plus the manual spare and the fact that every deletion is started by hand.
-Treat the countdown as the owner's chance to catch an item, never as a lock that holds it:
-do not write code or operator copy that treats an unexpired window as protection.
+The window is a notice by default. With ``ProfileSettings.enforce_grace_period`` on,
+``deletion_eligibility`` holds items whose clock is missing or has not ended. The planner,
+run summaries and executor use that partition; the executor also checks it per item.
+The notice set stays unchanged, so waiting titles remain on Leaving Soon.
 
 This module computes where each currently-condemned item sits in that window. There is no
 new state to store. The clock is ``FirstFlagged.first_flagged_at``, set once and never
@@ -35,7 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from reaper.clock import utcnow
 from reaper.db import KEY_CHUNK
-from reaper.db.models import FirstFlagged, Snapshot
+from reaper.db.models import Candidate, FirstFlagged, Snapshot
+from reaper.engine.policy import ProfileSettings
 from reaper.services import whitelist
 from reaper.services.condemned import effective_condemned
 
@@ -71,12 +68,9 @@ class GraceItem:
 class GraceReport:
     grace_days: int
     in_grace: list[GraceItem]
-    """Still counting down, soonest to clear first. Already plannable and deletable: the
-    countdown is what the owner sees, not a hold on the file (see the module docstring).
-    A spare ends it at any point, before or after it runs out."""
+    """Still counting down, soonest to clear first. Held from deletion only when enforced."""
     ready: list[GraceItem]
-    """The countdown has run out. The planner treats this list and ``in_grace`` the same
-    way, so the split says who has had their notice, not what has unlocked."""
+    """The countdown has run out. Every other deletion interlock still applies."""
     total_bytes_in_grace: int
     """A sum of what is known. An item the *arr could not size is left out, rather than
     counted as zero, so a total beside an unmeasured item reads low by that item."""
@@ -163,4 +157,44 @@ async def grace_report(
         ready=ready,
         total_bytes_in_grace=sum(i.size_bytes for i in in_grace if i.size_bytes is not None),
         total_bytes_ready=sum(i.size_bytes for i in ready if i.size_bytes is not None),
+    )
+
+
+@dataclass(frozen=True)
+class DeletionEligibility:
+    eligible: dict[str, Candidate]
+    waiting: dict[str, datetime | None]
+    """Excluded keys and their deadline. None means no reliable clock is available."""
+
+
+async def deletion_eligibility(
+    session: AsyncSession,
+    candidates: dict[str, Candidate],
+    settings: ProfileSettings,
+    *,
+    now: datetime | None = None,
+) -> DeletionEligibility:
+    """Narrow a deletion set without removing waiting titles from the notice set.
+
+    Scalar selects always read the stored clock, even if this session loaded an older
+    FirstFlagged object. Missing clocks and unrepresentable deadlines fail closed.
+    """
+    if not settings.enforce_grace_period:
+        return DeletionEligibility(dict(candidates), {})
+    now = now or utcnow()
+    deadlines: dict[str, datetime | None] = dict.fromkeys(candidates)
+    for chunk in batched(sorted(candidates), KEY_CHUNK, strict=False):
+        rows = await session.execute(
+            select(FirstFlagged.media_key, FirstFlagged.first_flagged_at).where(
+                FirstFlagged.media_key.in_(chunk)
+            )
+        )
+        for key, started in rows:
+            try:
+                deadlines[key] = started + timedelta(days=settings.grace_days)
+            except OverflowError:
+                deadlines[key] = None
+    waiting = {key: end for key, end in deadlines.items() if end is None or now < end}
+    return DeletionEligibility(
+        {key: candidate for key, candidate in candidates.items() if key not in waiting}, waiting
     )

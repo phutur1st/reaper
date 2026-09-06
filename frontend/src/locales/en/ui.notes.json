@@ -1170,5 +1170,9 @@
   "why.source.tvdb": "The display name for TVDB, a rating source. Product name: leave 'TVDB' untranslated.",
   "why.source.unknown": "The fallback {source_label} when Reaper cannot tell which rating source a value came from. Not a product name: translate it normally.",
   "why.streaming_nobody": "The why-panel's row for the actively-streaming protection when nobody is watching this title right now. A standalone sentence, no params.",
-  "why.streaming_now": "A lowercase fragment meaning someone is watching this title right now, nested inside a larger why-panel sentence. No params."
+  "why.streaming_now": "A lowercase fragment meaning someone is watching this title right now, nested inside a larger why-panel sentence. No params.",
+  "error.plan.grace_waiting": "Plan refusal when a requested title or season has not completed its enforced grace window.",
+  "error.reap.step.grace_waiting": "Per-item execution refusal. No deletion is sent.",
+  "reapPlan.breakdown.graceWaiting": "n is the count of movies and individual seasons held by the grace gate, including missing clocks.",
+  "reapPlan.breakdown.graceDate": "date and time are the same UTC deadline formatted in the browser locale and time zone. Other deletion checks still apply."
 }

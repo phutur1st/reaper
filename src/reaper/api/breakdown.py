@@ -10,7 +10,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 
 from reaper.api import tags as api_tags
+from reaper.api.errors import refuse_from
 from reaper.api.schemas import ReapBreakdownOut
+from reaper.refusal import Refusal
 from reaper.services import breakdown
 
 router = APIRouter(prefix="/api", tags=[api_tags.REAP])
@@ -19,7 +21,10 @@ router = APIRouter(prefix="/api", tags=[api_tags.REAP])
 @router.get("/reap/breakdown")
 async def get_reap_breakdown(request: Request) -> ReapBreakdownOut:
     async with request.app.state.session_factory() as session:
-        report = await breakdown.reap_breakdown(session)
+        try:
+            report = await breakdown.reap_breakdown(session)
+        except Refusal as exc:
+            refuse_from(exc)
     # Copies the service record field by field, including the nested `condemned_by` counts.
     # The wire model's field list controls what copies over. If the model names a field the
     # record does not have, `test_api_type_mirror.py` catches it. Without that test,

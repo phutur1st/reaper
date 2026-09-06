@@ -2031,7 +2031,7 @@ export function PolicyEditor({
   // Branch on the caps switch: with caps off the executor skips the per-run and rolling
   // checks entirely, so claiming a hard "at most N per run" here would contradict the
   // caps-off warning below and the run itself. The switch does not touch the grace countdown,
-  // which is a notice rather than a hold either way (services/grace.py).
+  // whose optional deletion gate is independent of the caps (services/grace.py).
   // A failed profile read says nothing about caps at all. The neutral "within your caps"
   // wording covers the still-LOADING case only: asserting caps are in force while the section
   // below says "Couldn't load these settings" would be a contradiction, on the one sentence
@@ -2816,9 +2816,22 @@ export function PolicyEditor({
                   ariaLabel={t("policyEditor.pace.gracePeriodLabel")}
                   onChange={(v) => updatePace({ grace_days: v })}
                 />
-                {/* A notice, not a hold: nothing on the deletion path reads this window
-                    (services/grace.py), so help promising time "before removal" was false. */}
                 <span className="help">{t("policyEditor.pace.gracePeriodHelp")}</span>
+              </span>
+
+              <span className="ex-label">{t("policyEditor.pace.enforceGraceLabel")}</span>
+              <span className="ex-ctl">
+                <Switch
+                  checked={pace.enforce_grace_period}
+                  onChange={(v) => updatePace({ enforce_grace_period: v })}
+                  ariaLabel={t("policyEditor.pace.enforceGraceLabel")}
+                  describedBy="grace-gate-help"
+                />
+                <span id="grace-gate-help" className="help">
+                  {pace.enforce_grace_period
+                    ? t("policyEditor.pace.graceEnforcedHelp")
+                    : t("policyEditor.pace.graceNoticeHelp")}
+                </span>
               </span>
 
               <span className="ex-label">{t("policyEditor.pace.unmeasuredLabel")}</span>

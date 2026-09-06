@@ -466,11 +466,21 @@ refused: it erases the protection during an *arr outage, the exact failure the g
 
 ## Delete mode
 
-**Choice: Grace is a notice window, not a gate.**
+**Choice: Grace is a notice by default, with an optional hard deletion gate.**
 
-It starts a DB-only countdown and drives Leaving Soon + Discord. Nothing on the deletion path
-reads it, so what actually spares a file at send time is the live played-since-approval and
-streaming vetoes.
+The original notice-only behavior remains the default for compatibility. Enabling
+`enforce_grace_period` requires an existing FirstFlagged clock whose start plus grace_days
+has passed. Missing clocks hold the item. The shared deletion_eligibility partition is used
+by planning, run counts, confirmation and execution. The executor checks settings and clocks
+again per item. Waiting titles remain condemned and visible on Leaving Soon.
+
+This applies to hand reaps and individual seasons too. An explicit selection containing a
+waiting title refuses instead of silently shrinking; bulk planning omits waiting titles.
+Existing clocks keep their start dates when enabled, including the existing re-entry reset
+rules. This is elapsed time since flagging, not proof that Plex or Discord delivered a notice.
+Grace remains outside the policy hash, like caps. Tightening it can hold a pending run's items;
+loosening it during execution never expands the run-start membership or relaxes its grace.
+Approval, the canary and all live interlocks remain required. This adds no autonomous deletion.
 
 ## Setup readiness
 

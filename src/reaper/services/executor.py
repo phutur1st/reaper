@@ -43,8 +43,7 @@ The interlocks, in the order they run:
    hash its snapshot was scored under, and this compares it to the policy in force now.
    A run scored under a superseded policy is refused; the fix is one scan.
 2. **Manual spare re-check, per item.** The owner can spare an item by hand after the
-   plan is built; that is what the grace countdown invites them to do (this executor
-   never reads that countdown itself; see ``services.grace``). A spare does not change
+   plan is built; the optional grace gate is checked separately. A spare does not change
    the frozen candidate row (it still reads ``condemn``) or the manifest hash, so this is
    a separate check, run for every item in a dry run and a real one alike, and it wins.
 3. **Caps abort, never truncate.** A run over its item or byte cap stops entirely.
@@ -128,8 +127,9 @@ from reaper.engine.reason import Reason, to_stored
 from reaper.refusal import MESSAGES, Refusal, english
 from reaper.services import list_config, run_totals, whitelist
 from reaper.services.condemned import effective_condemned, effective_verdict
+from reaper.services.grace import deletion_eligibility
 from reaper.services.planner import MediaRef, manifest_hash
-from reaper.services.profiles import live_policy_hash
+from reaper.services.profiles import active_profile, live_policy_hash
 
 log = structlog.get_logger(__name__)
 
@@ -861,6 +861,7 @@ class Executor:
         self._session = session
         self._safety = safety
         self._settings = settings
+        self._grace_settings = settings
         # The mid-run kill switch, re-read before every item of a real run, so turning
         # deletion off in the UI halts a run already in flight. Injected because the route
         # reads the database switch through a fresh session; this run's own session caches
@@ -990,6 +991,24 @@ class Executor:
         # ceiling; the frozen ``condemned`` dict above stays untouched for the manifest.
         self._decisions = await whitelist.overrides(self._session)
         effective = await effective_condemned(self._session, run.snapshot_id, self._decisions)
+        profile = await active_profile(self._session)
+        if profile.repaired:
+            raise ExecutionError("error.runs.limits_unreadable")
+        # Freeze the stricter grace present at claim time, including a change made after
+        # the route loaded its settings. A later loosening must not undo that hold.
+        self._grace_settings = self._settings
+        if profile.settings.enforce_grace_period:
+            self._grace_settings = profile.settings.model_copy(
+                update={
+                    "grace_days": max(
+                        profile.settings.grace_days,
+                        self._settings.grace_days if self._settings.enforce_grace_period else 0,
+                    )
+                }
+            )
+        effective = (
+            await deletion_eligibility(self._session, effective, self._grace_settings)
+        ).eligible
         self._effective_keys = set(effective)
         self._pending_refreshes = {}
         self._affected_sections = set()
@@ -1786,6 +1805,24 @@ class Executor:
             log.warning("reap.override_recheck_unreadable", error=str(exc))
             raise ExecutionError("error.reap.overrides_unreadable") from exc
 
+    async def _grace_refusal(self, candidate: Candidate) -> Reason | None:
+        """Re-read settings and clock per item; a live tightening can only keep more.
+
+        The run-start settings also apply, so disabling grace during a run cannot
+        release a file the run began holding. The run-start membership ceiling in
+        ``_one_delete`` separately prevents adding a newly eligible item.
+        """
+        profile = await active_profile(self._session)
+        if profile.repaired:
+            return Reason("error.runs.limits_unreadable")
+        for settings in (self._grace_settings, profile.settings):
+            eligibility = await deletion_eligibility(
+                self._session, {candidate.media_key: candidate}, settings
+            )
+            if eligibility.waiting:
+                return Reason("error.reap.step.grace_waiting")
+        return None
+
     async def _one_delete(
         self, delete: _Delete, *, is_canary: bool, approved_at: datetime
     ) -> StepOutcome:
@@ -1803,8 +1840,7 @@ class Executor:
 
         # A spare wins over everything, in a dry run and for real alike. The owner may
         # spare an item by hand after the plan was built, which is what the grace
-        # countdown invites (this executor never reads that window itself; see
-        # services.grace), and a frozen candidate row still reads ``condemn``, so this
+        # countdown invites, and a frozen candidate row still reads ``condemn``, so this
         # check, not the verdict and not the manifest hash, is what keeps a hand-spared
         # file.
         if whitelist.effective_override(candidate.media_key, self._decisions) == "spare":
@@ -1814,6 +1850,9 @@ class Executor:
                 check=Reason("error.reap.check.spared_by_hand"),
                 is_canary=is_canary,
             )
+
+        if (refusal := await self._grace_refusal(candidate)) is not None:
+            return self._mark_skipped(delete, refusal, check=refusal, is_canary=is_canary)
 
         # An item must pass both halves below, and each half checks a different fact, so
         # each gets its own sentence: an operator who had just put a reap back, or a

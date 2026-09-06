@@ -1081,6 +1081,7 @@ export interface ProfileSettings {
    *  governs `max_unmeasured_per_run`. */
   caps_enabled: boolean;
   grace_days: number;
+  enforce_grace_period: boolean;
   /** How many items with no size one run may delete. 0, the default, means never: the GB
    *  caps cannot bound them, so this count is the only bound there is. */
   max_unmeasured_per_run: number;
@@ -1243,7 +1244,16 @@ export interface PlexTrash {
   empties_after_scan: boolean | null;
 }
 
+export interface GraceWaitingItem {
+  candidate_id: number;
+  title: string;
+  grace_ends_at: string | null;
+}
+
 export interface ReapBreakdown {
+  grace_enforced: boolean;
+  grace_waiting: GraceWaitingItem[];
+  grace_waiting_bytes: number;
   /** False before the first scan, when every figure is zero. */
   has_snapshot: boolean;
   policy_condemned: number;

@@ -45,6 +45,7 @@ function profileWith(maxUnmeasured: number) {
     max_bytes_per_30d: 1,
     caps_enabled: true,
     grace_days: 14,
+    enforce_grace_period: false,
     max_unmeasured_per_run: maxUnmeasured,
   };
 }
@@ -59,6 +60,9 @@ function full(overrides: Partial<Breakdown> = {}): Breakdown {
     hand_reaped: 38,
     hand_reaped_bytes: 300 * GB,
     hand_reaped_held: 0,
+    grace_enforced: false,
+    grace_waiting: [],
+    grace_waiting_bytes: 0,
     will_reap: 569,
     will_reap_bytes: 4500 * GB,
     will_reap_unknown: 0,
@@ -359,4 +363,31 @@ describe("the pointers this card still owns", () => {
     renderBreakdown();
     expect(await screen.findByText(/4 titles are kept by spares that expired/)).toBeInTheDocument();
   });
+});
+
+it("shows waiting titles even when grace leaves nothing ready to plan", async () => {
+  const user = userEvent.setup();
+  apiMock.reapBreakdown.mockResolvedValue(
+    full({
+      grace_enforced: true,
+      grace_waiting: [
+        { candidate_id: 1, title: "Example one", grace_ends_at: "2026-01-22T12:00:00Z" },
+        { candidate_id: 2, title: "Example two", grace_ends_at: null },
+      ],
+      grace_waiting_bytes: 2 * GB,
+      will_reap: 0,
+      will_reap_bytes: 0,
+      will_reap_unknown: 0,
+      movies: 0,
+      seasons: 0,
+    }),
+  );
+  renderBreakdown();
+  expect(await screen.findByText("Grace enforced.")).toBeInTheDocument();
+  expect(
+    screen.getByText(/2 titles waiting for grace, excluded from this plan/),
+  ).toBeInTheDocument();
+  await user.click(screen.getByText("Earliest deletion dates"));
+  expect(screen.getByText(/Example one/)).toBeVisible();
+  expect(screen.getByText(/Countdown missing. Kept until a scan starts it/)).toBeVisible();
 });

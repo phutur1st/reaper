@@ -911,7 +911,8 @@
       "snapshot_degraded": "That scan came back incomplete, so Reaper won't act on it. Fix the source and scan again. {reason}",
       "unmeasured_over_limit": "This plan holds {count, plural, one {# item} other {# items}} Reaper couldn't measure, over your limit of {limit, plural, one {# item} other {# items}} per run. The plan is refused rather than trimmed: which of them gets deleted must not come down to the order they were listed in. Raise the limit, or reap fewer items at once.",
       "unmeasured_seasons": "Reaper couldn't measure any of the seasons it would remove from {keys}, so there is nothing here it can reap. Check them in Sonarr, then run a new scan.",
-      "unmeasured_sort_key": "{media_key} has no measured size to order by."
+      "unmeasured_sort_key": "{media_key} has no measured size to order by.",
+      "grace_waiting": "Some selected titles are still waiting for grace. Review their countdowns on Reap and try again after they end."
     },
     "plex": {
       "connection_address_invalid": "The server address must be a full web address, like https://192.0.2.10:32400.",
@@ -1065,7 +1066,8 @@
         "spared_by_hand": "You spared this by hand, so it is kept even though it was in the plan.",
         "transport_guard_blocked": "The transport guard blocked the delete: {error}",
         "unmonitor_not_verified": "Unmonitor did not take. Refused to delete files while still monitored.",
-        "unmonitor_verify_failed": "The season is still monitored after the unmonitor. Not deleting files."
+        "unmonitor_verify_failed": "The season is still monitored after the unmonitor. Not deleting files.",
+        "grace_waiting": "Grace has not ended or its countdown is missing. Kept."
       },
       "stopped_by_operator": "You stopped this run. Only the titles it had already reached were removed.",
       "unexpected": "The reap hit a problem it didn't expect: {error}",
@@ -1830,7 +1832,13 @@
       "scanFailed": "The scan didn't start. Try again.",
       "seeReview": "See Review",
       "singleTitleFootnote": "To spare or reap a single title, use <btn>Review</btn>.",
-      "willBeReaped": "Will be reaped"
+      "willBeReaped": "Will be reaped",
+      "graceEnforced": "Grace enforced.",
+      "graceWaiting": "{n, plural, =0 {No titles waiting for grace.} one {# title waiting for grace, excluded from this plan.} other {# titles waiting for grace, excluded from this plan.}}",
+      "graceDates": "Earliest deletion dates",
+      "graceDate": "After {date}, {time}",
+      "graceMissing": "Countdown missing. Kept until a scan starts it.",
+      "graceHeld": "Waiting for grace"
     },
     "degraded": {
       "notice": "<strong>This scan came back incomplete.</strong> {reason} You can still look at it, but Reaper won't act on it, so a plan can't be built. Fix the source and scan again."
@@ -2130,7 +2138,10 @@
       "titlesRowHeader": "Titles",
       "unmeasuredAriaLabel": "Items with an unknown size",
       "unmeasuredHelp": "Titles with no known size are kept by default. Above 0, one run may delete that many. 25 at most.",
-      "unmeasuredLabel": "Unknown-size items"
+      "unmeasuredLabel": "Unknown-size items",
+      "enforceGraceLabel": "Wait for grace before deleting",
+      "graceEnforcedHelp": "Deletion waits for each countdown to end, including hand reaps. Existing start dates stay. Your approval is still required.",
+      "graceNoticeHelp": "Notice only. You can delete a title before its countdown ends."
     },
     "pointsBudget": {
       "allBuiltIn": "all on built-in signals",
@@ -2224,7 +2235,7 @@
       "kindPolicy": "{kind} policy",
       "paceAndLimits": "pace and limits",
       "paceAppliesImmediately": "Pace applies immediately.",
-      "paceOnlyTail": "Changing a limit never affects a run you've already approved.",
+      "paceOnlyTail": "Pending runs use your saved grace and limits.",
       "policyBlockedNotice": "Save writes pace and limits only. Your {kind} policy can't go with it until {because}.",
       "savesOnlyKind": "Saves only your {kind} policy. The {otherKind} one is untouched. {appliesOnNextScan}"
     },
@@ -2456,7 +2467,8 @@
     "noChangeNotice": "Your changes leave every title as it is.",
     "pace": {
       "noCaps": "Your pace: no per-run limit until you turn limits back on. A flagged title shows as leaving for {days} days.",
-      "withCaps": "Your pace: at most {items} titles / {bytes} per run, and a flagged title shows as leaving for {days} days."
+      "withCaps": "Your pace: at most {items} titles / {bytes} per run, and a flagged title shows as leaving for {days} days.",
+      "graceEnforced": "Grace is enforced before deletion. These simulated flags include titles still waiting."
     },
     "progressStatus": "{detail}, {percent}%",
     "queuedRescanTail": "You can leave this page. The numbers here refresh when everything finishes.",

@@ -2275,8 +2275,8 @@ def _apply_first_flag(
     (watched, spared, or re-judged as protect), and later condemned again a full dormancy
     period afterward, must serve a fresh grace window. Its old ``first_flagged_at`` is far
     in the past, so grace_report would drop it straight into ``ready`` with no countdown
-    and no Leaving Soon warning. The window holds nothing back either way, see
-    ``services.grace``. What is lost is the warning. Reaper detects the return by the gap
+    and no Leaving Soon warning. With grace enforcement enabled, that would also skip
+    the deletion hold (``grace.deletion_eligibility``). Reaper detects the return by the gap
     since the item was last seen condemned. When that gap exceeds the grace window, so it
     genuinely left rather than just missing a snapshot to an outage, the clock restarts.
     ``last_seen_condemned_at`` exists for exactly this reset.

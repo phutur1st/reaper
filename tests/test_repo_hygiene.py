@@ -6540,6 +6540,7 @@ _MEMBERSHIP_INVENTORY: dict[str, tuple[int, str]] = {
     "src/reaper/services/fairness.py::_evidence_index": (1, "chunked"),
     "src/reaper/services/fairness.py::_distinct_episodes": (1, "chunked"),
     "src/reaper/services/grace.py::grace_report": (1, "chunked"),
+    "src/reaper/services/grace.py::deletion_eligibility": (1, "chunked"),
     "src/reaper/services/imdb_dataset.py::ImdbRatings.lookup": (1, "chunked"),
     "src/reaper/services/instances.py::arr_rows": (1, "bounded: two enum members"),
     "src/reaper/services/library_seen.py::record": (1, "chunked"),
@@ -7815,12 +7816,12 @@ def _refusal_code_sites() -> dict[str, list[str]]:
     return sites
 
 
-_EXPECTED_REFUSAL_CODES = 309
+_EXPECTED_REFUSAL_CODES = 311
 #: Multiple call sites can raise the same code, such as `config.RuntimeSafety.why_blocked`
 #: reusing an `error.safety.*` code the executor's own backstop already raises, or
 #: `update_check._incomplete()` building one `error.integration.update_check_incomplete`
 #: for several callers. So the site count moves independently of the code count.
-_EXPECTED_REFUSAL_SITES = 361
+_EXPECTED_REFUSAL_SITES = 368
 
 
 def test_every_refusal_code_has_a_raiser_and_a_catalog_entry() -> None:
@@ -7882,7 +7883,7 @@ _TRANSPORT_ONLY_CODES = frozenset(
 
 #: `len(MESSAGES) + len(_TRANSPORT_ONLY_CODES)`, pinned so the population this test collects
 #: cannot silently shrink to match a catalog that lost entries.
-_EXPECTED_CATALOG_ERROR_KEYS = 312
+_EXPECTED_CATALOG_ERROR_KEYS = 314
 
 
 def test_every_refusal_code_is_a_catalog_entry_the_browser_can_compose() -> None:

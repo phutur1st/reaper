@@ -361,13 +361,6 @@ export function Outcome({
 
       {pace && (
         <p className="help">
-          {/*
-            Grace only displays a countdown. Nothing on the deletion path reads the window
-            (services/grace.py), so "nothing is removed until it has waited out the N-day
-            grace period" would promise a hold that does not exist. Grace shows a title as
-            leaving for N days; what actually keeps it is a spare, a play, or the fact that a
-            person starts every run.
-          */}
           {pace.caps_enabled
             ? t("policySim.pace.withCaps", {
                 items: count(pace.max_items_per_run),
@@ -376,7 +369,8 @@ export function Outcome({
               })
             : // Caps off: the executor skips the per-run and rolling checks, so there is no
               // size limit to promise here. The countdown is unaffected by the switch.
-              t("policySim.pace.noCaps", { days: pace.grace_days })}
+              t("policySim.pace.noCaps", { days: pace.grace_days })}{" "}
+          {pace.enforce_grace_period && t("policySim.pace.graceEnforced")}
         </p>
       )}
 

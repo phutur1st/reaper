@@ -1104,7 +1104,7 @@ class TestTheProfileControlsTheCaps:
         shared = [
             name for name in ProfileSettingsIO.model_fields if name in ProfileSettings.model_fields
         ]
-        assert len(shared) == 7, "a cap arrived or left; these seven are the population"
+        assert len(shared) == 8, "caps, grace, its enforcement switch, and the allowance"
         assert set(ProfileSettingsIO.model_fields) - set(shared) == {"settings_recovered"}
 
         for name in shared:
@@ -2768,3 +2768,19 @@ class TestNothingCanDelete:
                 assert route.methods <= {"GET", "POST", "HEAD", "OPTIONS"}
                 assert "delete" not in route.path.lower()
                 assert "execute" not in route.path.lower()
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_grace_enforcement_round_trips_through_profile_api(
+    client: TestClient,
+    enabled: bool,
+) -> None:
+    saved = client.get("/api/profile").json()
+    saved["enforce_grace_period"] = enabled
+    saved["grace_days"] = 21
+    response = client.put("/api/profile", json=saved)
+    assert response.status_code == 200
+    assert response.json()["enforce_grace_period"] is enabled
+    fetched = client.get("/api/profile").json()
+    assert fetched["enforce_grace_period"] is enabled
+    assert fetched["grace_days"] == 21

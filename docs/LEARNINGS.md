@@ -100,8 +100,9 @@ rescues as failures slanders the policy.
 ⇒ The replay split regrets from rescues at the grace boundary.
 
 **Superseded in reasoning, and the code is gone.** The justification above ("still in
-quarantine") described a hold that does not exist: nothing on the deletion path reads the
-grace window, so an item is deletable from the moment it is condemned. What actually spares
+quarantine") described a hold that did not exist at the time: grace was only a notice.
+The later opt-in gate (`grace.deletion_eligibility`) does not validate those replay results.
+What actually spares
 a late play is the executor's live per-item vetoes, which fire on a play *after the plan was
 approved* — not on a boundary N days out. The replay never stopped splitting on the boundary,
 so every `rescued` figure it produced was a best case. It was deleted rather than corrected

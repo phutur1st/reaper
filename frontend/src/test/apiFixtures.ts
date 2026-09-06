@@ -34,6 +34,7 @@ export const DEFAULT_PROFILE: ProfileSettings = {
   max_bytes_per_30d: 10 * 1024 ** 4,
   caps_enabled: true,
   grace_days: 14,
+  enforce_grace_period: false,
   max_unmeasured_per_run: 0,
 };
 

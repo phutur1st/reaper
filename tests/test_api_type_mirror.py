@@ -63,13 +63,14 @@ import reaper.api
 from reaper.api.backup import RestoreSummaryOut
 from reaper.api.schemas import (
     CandidateLinkOut,
+    GraceWaitingItemOut,
     LinksOut,
     ReapBreakdownOut,
     RequesterRowOut,
     SignalCountOut,
 )
 from reaper.api.settings import SeerrServiceOut
-from reaper.services.breakdown import ReapBreakdown, SignalCount
+from reaper.services.breakdown import GraceWaitingItem, ReapBreakdown, SignalCount
 from reaper.services.deep_links import CandidateLink, DeepLinks
 from reaper.services.fairness import RequesterRow
 from reaper.services.instances import ServiceInstanceSuggestion
@@ -109,7 +110,7 @@ INNER_MODULES = ("reaper.engine.policy", "reaper.engine.explanation")
 #:
 #: This count is here because the collision assertion below is flag-shaped, and a flag
 #: cannot see a member that left the walk.
-_EXPECTED_SERVER_MODELS = 153
+_EXPECTED_SERVER_MODELS = 154
 
 #: Browser types whose server counterpart is spelled differently. Each is a real pair, the
 #: field sets are compared, and the rename is the only reason a suffix rule cannot find it.
@@ -199,8 +200,8 @@ CLIENT_ONLY = {
 # `RunOutcomeReadOut`, and `RunOutcomes` with `RunOutcomesOut`, both on the suffix rule.
 # Both +1 again for the run history's envelope: `RunList` pairs with `RunListOut` on the
 # suffix rule.
-EXPECTED_INTERFACES = 107
-EXPECTED_PAIRS = 105
+EXPECTED_INTERFACES = 108
+EXPECTED_PAIRS = 106
 
 _BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 _LINE_COMMENT = re.compile(r"//[^\n]*")
@@ -1346,6 +1347,7 @@ class TestEveryGateIdHasOperatorCopy:
 #: inside their parent, and ``SeerrServiceOut`` is built at two routes.
 COLLAPSED_PAIRS = (
     (ReapBreakdownOut, ReapBreakdown),
+    (GraceWaitingItemOut, GraceWaitingItem),
     (SignalCountOut, SignalCount),
     (RequesterRowOut, RequesterRow),
     (LinksOut, DeepLinks),
@@ -1355,8 +1357,8 @@ COLLAPSED_PAIRS = (
 )
 
 
-#: The call sites, reconciled by hand against the pair table above. Seven pairs over six
-#: sites: two models validate inside their parent, and ``SeerrServiceOut`` builds at two
+#: The call sites, reconciled by hand against the pair table above. Eight pairs over six
+#: sites: three models validate inside their parent, and ``SeerrServiceOut`` builds at two
 #: routes.
 #:
 #: Keyed on the *enclosing function* rather than the line, which is the same key

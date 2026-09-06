@@ -494,6 +494,7 @@ class ProfileSettingsIO(BaseModel):
     max_bytes_per_30d: int = Field(ge=1)
     caps_enabled: bool = True
     grace_days: int = Field(ge=7)
+    enforce_grace_period: bool = False
     max_unmeasured_per_run: int = Field(default=0, ge=0, le=25)
     """How many items with no size one run may delete. The GB caps cannot bound them, so
     this count is the only bound there is. Defaults to 0: never."""
@@ -1368,6 +1369,12 @@ class SignalCountOut(BaseModel):
     count: int
 
 
+class GraceWaitingItemOut(BaseModel):
+    candidate_id: int
+    title: str
+    grace_ends_at: datetime | None
+
+
 class ReapBreakdownOut(BaseModel):
     """What a reap built right now would remove, and why. Read-only, and deletes nothing.
 
@@ -1378,6 +1385,9 @@ class ReapBreakdownOut(BaseModel):
     first scan, when every figure is zero."""
 
     has_snapshot: bool
+    grace_enforced: bool = False
+    grace_waiting: list[GraceWaitingItemOut] = Field(default_factory=list)
+    grace_waiting_bytes: int = 0
     policy_condemned: int
     policy_condemned_bytes: int
     hand_spared: int

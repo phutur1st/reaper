@@ -51,8 +51,8 @@ Last verified against the code: 2026-08-02.
    barred from deleting. An autonomy grant would let it finish alone and tell you afterward.
    None can be written: a grant must record a passed backtest, and M3c, the engine that would
    have judged it, is dropped. Building this means choosing a different bar and dropping that
-   column with it (rule 148), plus a real gate on the timer, since grace is only a notice
-   (`services/grace.py`) and nothing stops a title being flagged and deleted the same night.
+   column with it (rule 148). The optional grace gate (`services/grace.py`) holds deletion
+   until the countdown ends; it does not grant unattended approval.
    Dropping the idea means deleting the table and this item, which is a valid way to close it.
 2. **Two leftovers in the stylesheet** (`docs/history/CSS_SPLIT_PLAN.md`). `.notice` still lives
    in the simulator section, and a dead-CSS pass has to stay manual, because 96 sites compute
@@ -79,7 +79,7 @@ A **†** marks a row whose reasoning is a section of the same name in `docs/DEC
 | A rebuilt source | **Tautulli's total aborts the scan, Plex's reissued keys degrade it** |
 | Why-panel scope | **Renders for keeps as well as deletes** † |
 | Server copy | **The server states facts, the browser says words** † |
-| Delete mode | **A notice window, not a gate** † |
+| Delete mode | **Grace notice by default, optional hard deletion gate** † |
 | Autonomy | **If ever built**: an earned grant keyed to `policy_hash`, any edit revokes it |
 | Caps | **Four**: items + bytes, per-run + rolling 30-day |
 | Size acquisition | **Sonarr or Radarr's own total, never a stand-in** † |

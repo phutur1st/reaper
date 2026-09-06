@@ -13,7 +13,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trans, useTranslation } from "react-i18next";
 import { api, type ReapBreakdown as ReapBreakdownData, type SignalCount } from "../api";
-import { bytes, count } from "../format";
+import { bytes, count, date, time } from "../format";
 import i18next from "../i18n";
 import { useHoldsBackUnmeasured } from "./queueSettings";
 import { Notice } from "./Notice";
@@ -142,7 +142,7 @@ export function ReapBreakdown({ onGoToReview }: { onGoToReview: () => void }) {
   const showLedger = !counts.allowanceUnknown && counts.reapCount > 0;
   const showExpiredSpares = data.spares_expired > 0;
   const showHeldReaps = data.hand_reaped_held > 0;
-  if (!showReasons && !showExpiredSpares && !showHeldReaps) return null;
+  if (!showReasons && !showExpiredSpares && !showHeldReaps && !data.grace_enforced) return null;
 
   // Held back, size unknown: the same figure the summary card's help sentence names, restated
   // here as the ledger row it is. Only real while the allowance actually holds them back
@@ -152,6 +152,34 @@ export function ReapBreakdown({ onGoToReview }: { onGoToReview: () => void }) {
 
   return (
     <div className="reap-card">
+      {!data.grace_enforced && (
+        <div className="rb-line">{t("policyEditor.pace.graceNoticeHelp")}</div>
+      )}
+      {data.grace_enforced && (
+        <div className="rb-line">
+          <strong>{t("reapPlan.breakdown.graceEnforced")}</strong>{" "}
+          {t("reapPlan.breakdown.graceWaiting", { n: data.grace_waiting.length })}
+          {data.grace_waiting.length > 0 && (
+            <details className="gates-fold">
+              <summary>{t("reapPlan.breakdown.graceDates")}</summary>
+              <ul>
+                {data.grace_waiting.map((item) => (
+                  <li key={item.candidate_id} style={{ overflowWrap: "anywhere" }}>
+                    {item.title}
+                    {": "}
+                    {item.grace_ends_at
+                      ? t("reapPlan.breakdown.graceDate", {
+                          date: date(item.grace_ends_at),
+                          time: time(item.grace_ends_at),
+                        })
+                      : t("reapPlan.breakdown.graceMissing")}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
       {showReasons && <Reasons rows={data.condemned_by} anchor={data.policy_condemned} />}
       {/* With nothing policy-condemned there are no reason bars, so without this line the
           card is a bare fold and the count above it looks like the policy's doing. */}
@@ -187,6 +215,13 @@ export function ReapBreakdown({ onGoToReview }: { onGoToReview: () => void }) {
                 <span className="rb-lab">{t("reapPlan.breakdown.handReaped")}</span>
                 <span className="rb-n">+ {count(data.hand_reaped)}</span>
                 <span className="rb-sz">{bytes(data.hand_reaped_bytes)}</span>
+              </div>
+            )}
+            {data.grace_waiting.length > 0 && (
+              <div className="rb-row rb-spare">
+                <span className="rb-lab">{t("reapPlan.breakdown.graceHeld")}</span>
+                <span className="rb-n">− {count(data.grace_waiting.length)}</span>
+                <span className="rb-sz">{bytes(data.grace_waiting_bytes)}</span>
               </div>
             )}
             {showHeldBack && (

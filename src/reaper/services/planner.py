@@ -56,6 +56,8 @@ from reaper.db.models import (
 from reaper.refusal import Refusal
 from reaper.services import whitelist
 from reaper.services.condemned import effective_condemned
+from reaper.services.grace import deletion_eligibility
+from reaper.services.profiles import active_profile
 
 log = structlog.get_logger(__name__)
 
@@ -497,6 +499,21 @@ async def build_plan(
             raise PlanError("error.plan.items_spared", keys=", ".join(sorted(spared)))
         plannable = [c for c in plannable if c.media_key in requested]
         selected = requested
+
+    # Resolve explicit selections before grace, so a waiting selection receives its own
+    # refusal rather than being misreported as spared or silently shortened. Whole-show
+    # selections likewise refuse if any selected season is still waiting.
+    profile = await active_profile(session)
+    if profile.repaired:
+        raise PlanError("error.runs.limits_unreadable")
+    eligibility = await deletion_eligibility(
+        session, {c.media_key: c for c in plannable}, profile.settings
+    )
+    if selected is not None and eligibility.waiting:
+        raise PlanError("error.plan.grace_waiting")
+    if plannable and not eligibility.eligible and eligibility.waiting:
+        raise PlanError("error.plan.grace_waiting")
+    plannable = list(eligibility.eligible.values())
 
     # Every narrowing above is done, so this is the exact set the run will act on, the
     # only set the canary check means anything over.

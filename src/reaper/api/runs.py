@@ -66,10 +66,11 @@ from reaper.services.executor import (
     RunReport,
     size_confirmed,
 )
+from reaper.services.grace import deletion_eligibility
 from reaper.services.planner import PlanError, build_plan, confirmation_phrase, plan_bytes
 from reaper.services.profiles import (
+    ActiveProfile,
     active_profile,
-    active_profile_settings,
     save_profile_settings,
 )
 from reaper.services.scan_runner import build_reap_gateway
@@ -197,7 +198,7 @@ class _RunReads:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._decisions: dict[str, str] | None = None
-        self._allow_unmeasured: bool | None = None
+        self._profile: ActiveProfile | None = None
         self._condemned: dict[int, dict[str, Candidate]] = {}
 
     async def decisions(self) -> dict[str, str]:
@@ -205,16 +206,24 @@ class _RunReads:
             self._decisions = await whitelist.overrides(self._session)
         return self._decisions
 
+    async def profile(self) -> ActiveProfile:
+        if self._profile is None:
+            self._profile = await active_profile(self._session)
+        return self._profile
+
     async def allow_unmeasured(self) -> bool:
-        if self._allow_unmeasured is None:
-            settings = await active_profile_settings(self._session)
-            self._allow_unmeasured = settings.max_unmeasured_per_run > 0
-        return self._allow_unmeasured
+        return (await self.profile()).settings.max_unmeasured_per_run > 0
 
     async def condemned(self, snapshot_id: int) -> dict[str, Candidate]:
         cached = self._condemned.get(snapshot_id)
         if cached is None:
             cached = await effective_condemned(self._session, snapshot_id, await self.decisions())
+            profile = await self.profile()
+            cached = (
+                {}
+                if profile.repaired
+                else (await deletion_eligibility(self._session, cached, profile.settings)).eligible
+            )
             self._condemned[snapshot_id] = cached
         return cached
 
@@ -761,11 +770,11 @@ async def execute_run(request: Request, run_id: int, payload: ExecuteRunIn) -> R
             if run is None:
                 refuse(404, "error.runs.not_found")
 
+            profile_settings = await _saved_limits_or_refuse(session)
             planned = await _planned_candidates(session, run)
             expected = confirmation_phrase(planned) if planned else "REAP 0 SOULS 0 GB"
             if payload.confirmation_phrase.strip() != expected:
                 refuse(409, "error.runs.confirmation_mismatch", expected=expected)
-            profile_settings = await _saved_limits_or_refuse(session)
             status.total = len(planned)
 
         # Builds the live clients now, in the request, so a misconfigured
@@ -1017,6 +1026,7 @@ def _settings_out(settings: ProfileSettings, *, recovered: bool = False) -> Prof
         max_bytes_per_30d=settings.max_bytes_per_30d,
         caps_enabled=settings.caps_enabled,
         grace_days=settings.grace_days,
+        enforce_grace_period=settings.enforce_grace_period,
         max_unmeasured_per_run=settings.max_unmeasured_per_run,
         settings_recovered=recovered,
     )
@@ -1025,8 +1035,8 @@ def _settings_out(settings: ProfileSettings, *, recovered: bool = False) -> Prof
 @profile_router.get("/profile")
 async def get_profile(request: Request) -> ProfileSettingsIO:
     """Return the pace settings. These are the caps a run obeys, and
-    separately the grace window, which only drives a notice (see
-    ``services.grace``). Built-in defaults apply until one is saved.
+    the grace window and its optional deletion gate (``services.grace``).
+    Built-in defaults apply until one is saved.
 
     Reports ``settings_recovered`` when the stored blob was unreadable and
     these are the shipped defaults, so the Pace page can tell the
@@ -1058,6 +1068,7 @@ async def update_profile(request: Request, payload: ProfileSettingsIO) -> Profil
             max_bytes_per_30d=payload.max_bytes_per_30d,
             caps_enabled=payload.caps_enabled,
             grace_days=payload.grace_days,
+            enforce_grace_period=payload.enforce_grace_period,
             max_unmeasured_per_run=payload.max_unmeasured_per_run,
         )
     except ValidationError as exc:
