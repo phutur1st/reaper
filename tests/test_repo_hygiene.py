@@ -4763,7 +4763,7 @@ _A11Y_RENDERS_NO_SURFACE_OF_ITS_OWN = {
 # file that drops out of the walk is otherwise missing from both halves while the two numbers
 # still agree with each other. Re-derive by running the test, never by arithmetic on the maps
 # above.
-_EXPECTED_RENDERING_TEST_FILES = 66
+_EXPECTED_RENDERING_TEST_FILES = 67
 
 
 def test_every_rendered_surface_is_audited_or_says_why_not() -> None:
@@ -5818,7 +5818,7 @@ def test_the_cycle_walk_reports_the_cycles_it_is_given() -> None:
 #: parses. Pinned for the same reason as `_EXPECTED_SOURCE_MODULES`, and it carries more
 #: weight here: the expected cycle set is empty, so a walk that stopped reading the tree
 #: would agree with a clean graph exactly.
-_EXPECTED_FRONTEND_MODULES = 251
+_EXPECTED_FRONTEND_MODULES = 253
 
 #: The two extensions a module in this tree can carry, and the only ones the walk resolves to.
 _TS_SUFFIXES = (".ts", ".tsx")

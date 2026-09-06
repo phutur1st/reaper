@@ -63,6 +63,10 @@ export interface Chip {
  *  every lane of the whole snapshot. `season` is null for a row whose key carried
  *  no season number; that row shows unnumbered rather than dropping out. */
 export interface GroupSeasonMark {
+  /** Live grace mode; absent or null means it could not be read. */
+  grace_enforced?: boolean | null;
+  /** UTC deadline shared with deletion eligibility; null means no reliable clock. */
+  grace_ends_at?: string | null;
   /** The candidate id for this season, so clicking its square opens that season's own
    *  reasoning rather than the whole show's panel. */
   id: number;
@@ -89,6 +93,10 @@ export interface GroupSeasonMark {
 }
 
 export interface Candidate {
+  /** Live grace mode; absent or null means it could not be read. */
+  grace_enforced?: boolean | null;
+  /** UTC deadline shared with deletion eligibility; null means no reliable clock. */
+  grace_ends_at?: string | null;
   id: number;
   media_key: string;
   title: string;

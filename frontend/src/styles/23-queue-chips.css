@@ -578,3 +578,15 @@
     border-style: dashed;
   }
 }
+
+.grace-badge {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+}
+.grace-exact {
+  display: block;
+  margin-inline-start: var(--space-md);
+}

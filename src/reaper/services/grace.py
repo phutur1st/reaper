@@ -167,6 +167,16 @@ class DeletionEligibility:
     """Excluded keys and their deadline. None means no reliable clock is available."""
 
 
+def grace_deadline(started: datetime | None, grace_days: int) -> datetime | None:
+    """The same deadline for deletion and display; an unreliable clock stays unknown."""
+    if started is None:
+        return None
+    try:
+        return started + timedelta(days=grace_days)
+    except OverflowError:
+        return None
+
+
 async def deletion_eligibility(
     session: AsyncSession,
     candidates: dict[str, Candidate],
@@ -190,10 +200,7 @@ async def deletion_eligibility(
             )
         )
         for key, started in rows:
-            try:
-                deadlines[key] = started + timedelta(days=settings.grace_days)
-            except OverflowError:
-                deadlines[key] = None
+            deadlines[key] = grace_deadline(started, settings.grace_days)
     waiting = {key: end for key, end in deadlines.items() if end is None or now < end}
     return DeletionEligibility(
         {key: candidate for key, candidate in candidates.items() if key not in waiting}, waiting

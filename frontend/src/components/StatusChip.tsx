@@ -27,10 +27,12 @@ export function StatusChip({ chip }: { chip: Chip | null }) {
 /** The red mark a condemned season wears in the all-seasons list, where rows from
  *  every lane sit side by side. Condemned rows carry no server chip (their card leads
  *  with the amber dormancy pill), so the list states their fate with this constant. */
-export function CondemnedChip() {
+export function CondemnedChip({ marked = false }: { marked?: boolean }) {
   const { t } = useTranslation();
   return (
-    <span className="status-chip status-pressure">{t("shell.statusChip.wouldBeRemoved")}</span>
+    <span className="status-chip status-pressure">
+      {marked ? t("reviewGrace.marked") : t("shell.statusChip.wouldBeRemoved")}
+    </span>
   );
 }
 
@@ -90,6 +92,8 @@ export function OverrideChip({
   exceptions = 0,
   spareCoversUntil = null,
   family = "chip",
+  graceHeld = false,
+  graceTracked = false,
 }: {
   override: Override | null;
   effective?: boolean | null | undefined;
@@ -109,6 +113,8 @@ export function OverrideChip({
    *  which is both, since a show has no parent to inherit a longer spare from. */
   spareCoversUntil?: string | null;
   family?: ChipFamily;
+  graceHeld?: boolean;
+  graceTracked?: boolean;
 }) {
   const { t } = useTranslation();
   const classes = OVERRIDE_CLASSES[family];
@@ -146,6 +152,13 @@ export function OverrideChip({
         {t("shell.statusChip.reapRequestedKept", {
           why: keptWhy ?? t("shell.statusChip.reapRequestedKeptDefaultWhy"),
         })}
+      </span>
+    );
+  }
+  if (graceTracked || graceHeld) {
+    return (
+      <span className={graceHeld ? classes.refused : classes.reap}>
+        {t("reviewGrace.handMarked")}
       </span>
     );
   }

@@ -109,6 +109,8 @@ import {
   showReapReaches,
   type Fate,
 } from "./reviewFate";
+import { GraceBadge, GraceSummary, useGraceNow } from "./GraceBadge";
+import { displayFate, graceHeld } from "./reviewFate";
 import { chipWhy, CondemnedChip, OverrideChip, StatusChip } from "./StatusChip";
 import { staleReadLine, StaleReadNotice } from "./StaleReadNotice";
 
@@ -280,10 +282,11 @@ export function Poster({ url, alt }: { url: string | null; alt: string }) {
 
 /** The score chip. Color carries the item's fate so it reads without the label. */
 function Score({ item }: { item: Candidate }) {
+  useGraceNow();
   const { t } = useTranslation();
   return (
     <span
-      className={`score score-${handFate(item)}`}
+      className={`score score-${displayFate(item)}`}
       title={t("reviewQueue.scoreTitle", { score: item.score })}
     >
       {item.score}
@@ -582,6 +585,7 @@ function SeasonStrip({
   marks: GroupSeasonMark[];
   onOpen: (id: number) => void;
 }) {
+  useGraceNow();
   const { t } = useTranslation();
   const lanes = markLabels();
   return (
@@ -591,7 +595,7 @@ function SeasonStrip({
           mark.season === 0
             ? t("reviewQueue.specials")
             : t("reviewQueue.seasonNumber", { n: mark.season ?? "?" });
-        const fate = handFate(mark);
+        const fate = displayFate(mark);
         const reapRefused = fate === "refused";
         // The base square is the scan verdict; a hand decision paints over it. A reap the
         // engine can't honor yet reads dashed red (noted, but the file is held), never the
@@ -798,6 +802,14 @@ function seasonDivergence(
   season: Candidate,
   showOverride: Override,
 ): { chip: ReactNode; reason: string | null } {
+  if (season.override === "reap" && graceHeld(season)) {
+    return {
+      chip: (
+        <span className="status-chip status-reap-held">{i18next.t("reviewGrace.handMarked")}</span>
+      ),
+      reason: null,
+    };
+  }
   // A held reap is noted but the file is still kept: dashed red, never the solid red of a
   // removal. Judged by the item's own fate, so an inherited held reap reads the same as an own one.
   if (handFate(season) === "refused") {
@@ -881,6 +893,7 @@ function SeasonList({
    *  only way it can know the wait is its own. */
   busyKey: string | null;
 }) {
+  useGraceNow();
   const { t } = useTranslation();
   // One request per expanded show, and with "Expand seasons by default" on that is one per
   // drawn card: unbounded as the render window grows, and fired all over again every time
@@ -929,7 +942,12 @@ function SeasonList({
           // The SHOW's own spare, matching the show decision the banner states, never a
           // season's, which the rows below carry themselves.
           spareExpiresAt={data.show_spare_expires_at}
-          reapReach={showReapReach(data.seasons)}
+          reapReach={showReapReach(
+            data.seasons.map((s) => ({
+              ...s,
+              override_effective: graceHeld(s) ? false : s.override_effective,
+            })),
+          )}
         />
       )}
       <ul
@@ -958,6 +976,8 @@ function SeasonList({
               <OverrideChip
                 override={season.override}
                 effective={season.override_effective}
+                graceHeld={graceHeld(season)}
+                graceTracked={season.grace_enforced != null}
                 keptWhy={chipWhy(season.chip)}
                 spareCoversUntil={season.spare_covers_until}
                 // The season list's own class family, exactly like ShowPanel's SeasonPill and
@@ -968,7 +988,7 @@ function SeasonList({
               />
             );
           } else if (season.verdict === "condemn") {
-            chip = <CondemnedChip />;
+            chip = <CondemnedChip marked={season.grace_enforced != null} />;
           } else {
             chip = <StatusChip chip={season.chip} />;
           }
@@ -1000,6 +1020,7 @@ function SeasonList({
                   <span className="season-name">{seasonName(season.title, data.title)}</span>
                 </CardOpen>
                 {chip}
+                <GraceBadge item={season} />
               </span>
               {/* The control toggles the season's OWN decision (override_own), never the one it
                   inherits from its show. Reap is dropped only when this season's own verdict is
@@ -1059,6 +1080,7 @@ const MovieCard = memo(function MovieCard({
   pending: boolean;
   hideReap: boolean;
 }) {
+  useGraceNow();
   const { t } = useTranslation();
   const state =
     item.override === "spare" ? "card-spared" : item.override === "reap" ? "card-reaped" : "";
@@ -1106,6 +1128,8 @@ const MovieCard = memo(function MovieCard({
           <OverrideChip
             override={item.override}
             effective={item.override_effective}
+            graceHeld={graceHeld(item)}
+            graceTracked={item.grace_enforced != null}
             keptWhy={chipWhy(item.chip)}
             spareCoversUntil={item.spare_covers_until}
           />
@@ -1124,6 +1148,7 @@ const MovieCard = memo(function MovieCard({
           <span>{itemBytes(item.size_bytes)}</span>
           <ResolutionBadge value={item.video_resolution} />
           <RequestedChip who={item.requested_by} />
+          <GraceBadge item={item} />
         </div>
         <CardStatusLine
           condemned={isCondemned(item)}
@@ -1197,6 +1222,7 @@ const ShowCard = memo(function ShowCard({
    *  `media_key` and no boolean computed from the show's key can speak for them. */
   busyKey: string | null;
 }) {
+  useGraceNow();
   const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
   // The operator's "expand by default" preference may resolve a tick after this card first
@@ -1333,6 +1359,8 @@ const ShowCard = memo(function ShowCard({
             <OverrideChip
               override={showOverride}
               effective={groupReapEffective(showSeasons)}
+              graceHeld={showSeasons.some((s) => graceHeld(s))}
+              graceTracked={showSeasons.some((s) => s.grace_enforced != null)}
               // Seasons whose OWN decision opposes the show's (their effective override differs
               // from show_override), so the chip won't claim the whole show is kept/removed
               // when one season inside goes the other way.
@@ -1366,17 +1394,24 @@ const ShowCard = memo(function ShowCard({
             />
             <span>
               {isReapTab
-                ? t("reviewQueue.condemnedOfTotal", {
-                    condemned: condemnedCount,
-                    total: totalSeasons,
-                    size: totalBytes(condemnedBytes, condemnedUnknown),
-                  })
+                ? showSeasons.some((s) => s.grace_enforced != null)
+                  ? t("reviewGrace.markedOfTotal", {
+                      n: condemnedCount,
+                      total: totalSeasons,
+                      size: totalBytes(condemnedBytes, condemnedUnknown),
+                    })
+                  : t("reviewQueue.condemnedOfTotal", {
+                      condemned: condemnedCount,
+                      total: totalSeasons,
+                      size: totalBytes(condemnedBytes, condemnedUnknown),
+                    })
                 : totalBytes(wholeShowBytes ?? fetchedSize, unknownSeasons)}
             </span>
             {/* Ended, or a status we couldn't read. A show that is still going wears
                 nothing here: the quiet row is the common case. */}
             <ShowStatusChip status={showStatus} quiet />
             <RequestedChip who={group.requestedBy} />
+            <GraceSummary seasons={showSeasons} />
           </div>
           {marks && marks.length > 1 && <SeasonStrip marks={marks} onOpen={onOpen} />}
           <CardStatusLine
@@ -1774,6 +1809,7 @@ export function ReviewQueue({
   // header render a bare sum instead of saying what every other total says it could not
   // include.
   const totalSize = pages?.pages[0]?.total_bytes ?? 0;
+  const queueGraceEnforced = data?.some((item) => item.grace_enforced === true) ?? false;
   const totalUnknownSize = pages?.pages[0]?.unknown_size ?? 0;
 
   // Reveal another render-page as the sentinel scrolls into view.
@@ -2823,13 +2859,19 @@ export function ReviewQueue({
                   itemsCount: count(totalItems),
                   n: totalItems,
                   sizeText: bytes(totalSize),
-                  freed: !activeCollection && verdict === "condemn" ? "yes" : "no",
+                  freed:
+                    !activeCollection && verdict === "condemn" && !queueGraceEnforced
+                      ? "yes"
+                      : "no",
                   hasUnknown: totalUnknownSize > 0 ? "yes" : "no",
                   unknownCount: count(totalUnknownSize),
                   u: totalUnknownSize,
                 }}
                 components={{ itemsNum: <strong />, sizeNum: <strong />, unknownNum: <strong /> }}
               />
+              {!activeCollection && verdict === "condemn" && queueGraceEnforced && (
+                <> {t("reviewGrace.queueIncludesWaiting")}</>
+              )}
             </p>
             <div className={`card-list ${selectMode ? "card-list-selecting has-bulk-bar" : ""}`}>
               {shownGroups.map((group, i) => (

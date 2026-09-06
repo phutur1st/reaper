@@ -1530,6 +1530,15 @@ export function PolicyEditor({
       // The Reap breakdown reads grace_days (its countdown and unmeasured lines), so a saved
       // grace or cap change refreshes it.
       void queryClient.invalidateQueries({ queryKey: ["reap-breakdown"] });
+      for (const key of [
+        "candidates",
+        "candidates-unfiltered",
+        "candidates-fate",
+        "candidate",
+        "group",
+      ]) {
+        void queryClient.invalidateQueries({ queryKey: [key] });
+      }
     },
   });
   // `settings_recovered` forces dirty for the same reason `fell_back` does on the policy half
