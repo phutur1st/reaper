@@ -20,14 +20,18 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reaper.clock import utcnow
 from reaper.db.models import Candidate, Snapshot
+from reaper.refusal import Refusal
 from reaper.services import whitelist
 from reaper.services.condemned import effective_condemned, held_reaps
+from reaper.services.grace import deletion_eligibility
+from reaper.services.profiles import active_profile
 
 
 @dataclass(frozen=True)
@@ -39,8 +43,18 @@ class SignalCount:
 
 
 @dataclass(frozen=True)
+class GraceWaitingItem:
+    candidate_id: int
+    title: str
+    grace_ends_at: datetime | None
+
+
+@dataclass(frozen=True)
 class ReapBreakdown:
     has_snapshot: bool
+    grace_enforced: bool
+    grace_waiting: list[GraceWaitingItem]
+    grace_waiting_bytes: int
     # The ledger. Counts are the reap decision (measured and unmeasured together); the byte
     # figures sum only what has a size. Three of them carry their own unmeasured count
     # (`will_reap`, `movies`, `seasons`); the rest do not.
@@ -91,6 +105,9 @@ class ReapBreakdown:
 def _empty() -> ReapBreakdown:
     return ReapBreakdown(
         has_snapshot=False,
+        grace_enforced=False,
+        grace_waiting=[],
+        grace_waiting_bytes=0,
         policy_condemned=0,
         policy_condemned_bytes=0,
         hand_spared=0,
@@ -198,6 +215,24 @@ async def reap_breakdown(session: AsyncSession) -> ReapBreakdown:
         1 for c in spared_rows if whitelist.effective_override(c.media_key, surviving) != "spare"
     )
 
+    hand_reaped_rows = [c for c in effective if c.verdict != "condemn"]
+    profile = await active_profile(session)
+    if profile.repaired:
+        raise Refusal("error.runs.limits_unreadable")
+    eligibility = await deletion_eligibility(
+        session, {c.media_key: c for c in effective}, profile.settings, now=now
+    )
+    grace_waiting = [
+        GraceWaitingItem(c.id, c.title, eligibility.waiting[c.media_key])
+        for c in effective
+        if c.media_key in eligibility.waiting
+    ]
+    grace_waiting_bytes = sum(
+        c.size_bytes
+        for c in effective
+        if c.media_key in eligibility.waiting and c.size_bytes is not None
+    )
+    effective = list(eligibility.eligible.values())
     will_reap = len(effective)
     will_bytes = sum(c.size_bytes for c in effective if c.size_bytes is not None)
     will_unknown = sum(1 for c in effective if c.size_bytes is None)
@@ -206,8 +241,7 @@ async def reap_breakdown(session: AsyncSession) -> ReapBreakdown:
     seasons = sum(1 for c in effective if c.media_type == "season")
     seasons_unknown = sum(1 for c in effective if c.media_type == "season" and c.size_bytes is None)
 
-    # A hand reap is a net row the policy did not condemn on its own.
-    hand_reaped_rows = [c for c in effective if c.verdict != "condemn"]
+    # Count additions before grace, then the ledger subtracts waiting titles separately.
     hand_reaped = len(hand_reaped_rows)
     hand_reaped_bytes = sum(c.size_bytes for c in hand_reaped_rows if c.size_bytes is not None)
 
@@ -226,6 +260,9 @@ async def reap_breakdown(session: AsyncSession) -> ReapBreakdown:
 
     return ReapBreakdown(
         has_snapshot=True,
+        grace_enforced=profile.settings.enforce_grace_period,
+        grace_waiting=grace_waiting,
+        grace_waiting_bytes=grace_waiting_bytes,
         policy_condemned=policy_condemned,
         policy_condemned_bytes=policy_bytes,
         hand_spared=hand_spared,

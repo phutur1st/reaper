@@ -100,16 +100,16 @@ async def active_profile(session: AsyncSession) -> ActiveProfile:
     other unreadable value falls back to the built-in defaults instead, and that case IS
     flagged, because those defaults can be less strict than what was saved.
     """
-    row = (
-        await session.execute(select(Profile).order_by(Profile.id.asc()).limit(1))
+    settings_json = (
+        await session.execute(select(Profile.settings_json).order_by(Profile.id.asc()).limit(1))
     ).scalar_one_or_none()
-    if row is None:
+    if settings_json is None:
         return ActiveProfile(ProfileSettings())
     try:
-        return ActiveProfile(ProfileSettings.model_validate_json(row.settings_json))
+        return ActiveProfile(ProfileSettings.model_validate_json(settings_json))
     except ValidationError as exc:
         try:
-            raw = json.loads(row.settings_json)
+            raw = json.loads(settings_json)
         except ValueError:
             raw = None
         if isinstance(raw, dict):

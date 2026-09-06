@@ -1778,3 +1778,26 @@ describe("the delete threshold's consequence sentence", () => {
     },
   );
 });
+
+describe("the optional grace deletion gate", () => {
+  it("explains both modes and saves the operator's opt-in with pace", async () => {
+    const user = userEvent.setup();
+    apiMock.saveProfile.mockResolvedValue({ ...pace, enforce_grace_period: true });
+    renderEditor({ body: body() }, { ...pace, enforce_grace_period: false });
+    const toggle = await screen.findByRole("switch", { name: "Wait for grace before deleting" });
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText(/Notice only. You can delete/)).toBeInTheDocument();
+    await user.click(toggle);
+    expect(toggle).toBeChecked();
+    expect(screen.getByText(/Deletion waits for each countdown to end/)).toBeInTheDocument();
+    const save = screen.getByRole("button", { name: "Save changes" });
+    await waitFor(() => expect(save).toBeEnabled());
+    await user.click(save);
+    await waitFor(() =>
+      expect(apiMock.saveProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ enforce_grace_period: true }),
+      ),
+    );
+  });
+});
