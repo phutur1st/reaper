@@ -66,6 +66,8 @@ export function Settings({
   onPanelChange,
   jump,
   onGoToPolicy,
+  onGoToGrace,
+  onGoToReview,
 }: {
   /** Which section is open. Owned by `App`, not by this file: the address bar names the open
    *  panel (`/settings/logs`), and the URL is written where every other nav is written. */
@@ -80,6 +82,8 @@ export function Settings({
   /** Jump to the Policy screen's keep-rules section, for the Lists rows' policy-use links.
    *  Optional the way `SafetyBanner`'s jump is: tests mount Settings without a navigator. */
   onGoToPolicy?: (() => void) | undefined;
+  onGoToGrace?: (() => void) | undefined;
+  onGoToReview?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   // General's save bar can hold six unsaved fields at once, and switching section unmounts the
@@ -225,7 +229,13 @@ export function Settings({
         {panel === "services" && <ServicesPanel />}
         {panel === "plex" && <PlexPanel onDirtyChange={setPlexDirty} />}
         {panel === "lists" && <ListsPanel onGoToPolicy={onGoToPolicy} />}
-        {panel === "jobs" && <JobsPanel onGoToPlex={() => confirmSwitch.request("plex")} />}
+        {panel === "jobs" && (
+          <JobsPanel
+            onGoToGrace={onGoToGrace}
+            onGoToReview={onGoToReview}
+            onGoToPlex={() => confirmSwitch.request("plex")}
+          />
+        )}
         {panel === "notifications" && <NotificationsPanel onDirtyChange={setWebhookDirty} />}
         {panel === "security" && <SecurityPanel onDirtyChange={setSecurityDirty} />}
         {panel === "backup" && <BackupPanel onDirtyChange={setBackupDirty} />}

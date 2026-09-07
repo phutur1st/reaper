@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { DEFAULT_PROFILE } from "../test/apiFixtures";
 import type { Simulation } from "../api";
 import { expectNoA11yViolations } from "../test/a11y";
 import {
@@ -442,3 +443,23 @@ describe("what the spared-by list calls each protection", () => {
     await expectNoA11yViolations(container);
   });
 });
+
+it.each([true, false])(
+  "qualifies simulated removal totals with grace enforcement %s",
+  (enabled) => {
+    render(
+      <Outcome
+        simulation={BASE}
+        threshold={62}
+        pace={{ ...DEFAULT_PROFILE, enforce_grace_period: enabled }}
+        edited={false}
+        mediaType="tv"
+      />,
+    );
+    expect(screen.getByText("marked for removal")).toBeInTheDocument();
+    expect(screen.getByText("space marked for removal")).toBeInTheDocument();
+    expect(screen.queryByText("Includes titles still waiting for grace.") !== null).toBe(enabled);
+    expect(screen.queryByText("items would be removed")).not.toBeInTheDocument();
+    expect(screen.queryByText("reclaimed")).not.toBeInTheDocument();
+  },
+);

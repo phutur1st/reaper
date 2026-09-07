@@ -7,6 +7,7 @@
 // the never-loaded sentence for a read that really never landed, and the stale line for one
 // that landed and then blinked. A fix that showed the stale line in both cases would pass a
 // one-sided test.
+import { DEFAULT_PROFILE } from "../test/apiFixtures";
 import { screen, waitFor } from "@testing-library/react";
 import type { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +101,7 @@ const SCAN_UNKNOWN = "Couldn't check the schedule.";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  apiMock.profile.mockResolvedValue(DEFAULT_PROFILE);
   apiMock.update.mockResolvedValue(DEFAULT_UPDATE);
   apiMock.safety.mockResolvedValue({
     destructive_enabled: false,
