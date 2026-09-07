@@ -159,7 +159,7 @@ it("distinguishes notice-only timing from a deletion hold", async () => {
   apiMock.profile.mockResolvedValue({ ...DEFAULT_PROFILE, enforce_grace_period: false });
   renderJobs();
   expect(
-    await screen.findByText("Current policy: Grace is notice only; it does not block deletion."),
+    await screen.findByText("Current policy: Notice only. Grace does not block deletion."),
   ).toBeInTheDocument();
 });
 
@@ -167,7 +167,7 @@ it("does not claim a grace mode while the profile is loading", async () => {
   apiMock.schedule.mockResolvedValue(schedule({}));
   apiMock.profile.mockReturnValue(new Promise(() => {}));
   renderJobs();
-  expect(await screen.findByText("Reading current grace policy…")).toBeInTheDocument();
+  expect(await screen.findByText("Reading grace policy…")).toBeInTheDocument();
   expect(screen.queryByText(/Current policy:/)).not.toBeInTheDocument();
 });
 
@@ -184,7 +184,7 @@ it.each(["failed", "recovered"])(
       });
     renderJobs();
     expect(
-      await screen.findByText("Grace status unavailable. Check Pace and limits."),
+      await screen.findByText("Grace unavailable. Check Pace and limits."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Current policy:/)).not.toBeInTheDocument();
   },
@@ -203,8 +203,6 @@ it("replaces a previously confirmed grace mode when its refresh fails", async ()
   await act(async () => {
     await client.invalidateQueries({ queryKey: ["profile"] });
   });
-  expect(
-    await screen.findByText("Grace status unavailable. Check Pace and limits."),
-  ).toBeInTheDocument();
+  expect(await screen.findByText("Grace unavailable. Check Pace and limits.")).toBeInTheDocument();
   expect(screen.queryByText(/Current policy:/)).not.toBeInTheDocument();
 });

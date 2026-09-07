@@ -1790,7 +1790,7 @@ describe("the optional grace deletion gate", () => {
     expect(screen.getByText(/Notice only. You can delete/)).toBeInTheDocument();
     await user.click(toggle);
     expect(toggle).toBeChecked();
-    expect(screen.getByText(/Deletion waits for each countdown to end/)).toBeInTheDocument();
+    expect(screen.getByText(/Holds hand reaps too/)).toBeInTheDocument();
     const save = screen.getByRole("button", { name: "Save changes" });
     await waitFor(() => expect(save).toBeEnabled());
     await user.click(save);

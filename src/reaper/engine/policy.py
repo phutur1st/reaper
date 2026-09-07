@@ -1102,10 +1102,9 @@ class ProfileSettings(Frozen):
     Floored at 7 so people have at least a week to act."""
 
     enforce_grace_period: bool = False
-    """Require a completed grace window before planning or deleting, including hand reaps.
-    Off by default for compatibility. Missing clocks hold the file. Existing clocks keep
-    their start date when enabled. Independent of caps and excluded from the policy hash;
-    the planner and executor check the live settings instead."""
+    """Enable ``grace.deletion_eligibility`` for planning and execution, including hand reaps.
+    Off by default. When enabled, missing clocks hold items; existing clocks retain their
+    start dates. Independent of caps and excluded from the policy hash."""
 
     max_unmeasured_per_run: int = Field(default=0, ge=0, le=25)
     """How many items with no known size a single run may delete. ``0``, the default,

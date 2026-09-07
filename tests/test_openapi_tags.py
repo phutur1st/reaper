@@ -237,7 +237,7 @@ def test_grace_setting_and_breakdown_are_documented_in_served_schema(
     profile = models["ProfileSettingsIO"]["properties"]
     flag = profile["enforce_grace_period"]
     assert flag["default"] is False
-    for term in ("notice-only", "hand reaps", "missing clocks", "rechecks"):
+    for term in ("notice-only", "hand reaps", "missing timestamps", "approval"):
         assert term in flag["description"].lower()
     assert "restart" in profile["grace_days"]["description"]
     breakdown = models["ReapBreakdownOut"]["properties"]
