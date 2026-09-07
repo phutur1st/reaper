@@ -310,6 +310,7 @@
  * only one of them drifts out of sync with the rest. `.coll-chip-main` only, not the wrapping
  * `.coll-chip` or its caret: the caret stays the family's fixed square, and `align-items:
  * stretch` on the wrapper carries a wrapped name's extra height to it for free. */
+.grace-badge,
 .chip-requested,
 .lib-chip,
 .coll-chip-main {
@@ -580,13 +581,13 @@
 }
 
 .grace-badge {
-  white-space: normal;
-  overflow-wrap: anywhere;
+  display: inline-block;
+  min-width: 0;
   color: var(--muted);
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
 }
 .grace-exact {
   display: block;
-  margin-inline-start: var(--space-md);
+  margin-inline-start: 0;
 }
