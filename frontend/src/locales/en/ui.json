@@ -94,7 +94,7 @@
     "leavingSoon": {
       "counts": "<movieNum>{movieCount}</movieNum> {movies, plural, one {movie} other {movies}} and <seasonNum>{seasonCount}</seasonNum> {seasons, plural, one {season} other {seasons}} on the shelves",
       "countsAtLastUpdate": "<movieNum>{movieCount}</movieNum> {movies, plural, one {movie} other {movies}} and <seasonNum>{seasonCount}</seasonNum> {seasons, plural, one {season} other {seasons}} were on the shelves at the last update",
-      "desc": "Adds every title that's counting down to the Plex shelf, so people see it before it's removed.",
+      "desc": "Updates the Plex shelf for titles marked for removal. Countdowns and deletion holds are shown in Review.",
       "didNotUpdate": "It didn't update",
       "loadFailed": "Couldn't load the shelf status. Reload to try again.",
       "manageLink": "Manage in Plex → Leaving Soon",
@@ -141,7 +141,7 @@
       }
     },
     "panel": {
-      "blurb": "Reaper's scheduled jobs. Run any of them now. A scan refreshes the review queue. The rest is upkeep.",
+      "blurb": "Run scheduled jobs now or change their timing. A scan refreshes the review queue. Scheduled jobs never delete media.",
       "heading": "Jobs",
       "loadFailed": "Couldn't load the upkeep jobs. Reload to try again.",
       "loadingJobs": "Loading the upkeep jobs…"
@@ -225,6 +225,14 @@
       "inHours": "in {hours} hr",
       "inMinutes": "in {mins} min",
       "unscheduled": "not scheduled"
+    },
+    "grace": {
+      "enforced": "Current policy: Grace enforced, {n, plural, one {# day} other {# days}}.",
+      "notice": "Current policy: Grace is notice only; it does not block deletion.",
+      "loading": "Reading current grace policy…",
+      "unavailable": "Grace status unavailable. Check Pace and limits.",
+      "policyLink": "Policy → Pace and limits",
+      "reviewLink": "View countdowns in Review"
     }
   },
   "signals": {
@@ -2461,18 +2469,18 @@
       "bucketTooltip": "{low}–{high}: {n} items"
     },
     "histogramHelp": "Every title's score, 0 to 100. The line is your threshold. Red bars are past it.",
-    "itemsWouldBeRemoved": "items would be removed",
+    "itemsWouldBeRemoved": "marked for removal",
     "moreLeftAlone": "…and {n} more that your last scan left alone",
     "newOnTheList": "New on the list",
     "noChangeNotice": "Your changes leave every title as it is.",
     "pace": {
       "noCaps": "Your pace: no per-run limit until you turn limits back on. A flagged title shows as leaving for {days} days.",
       "withCaps": "Your pace: at most {items} titles / {bytes} per run, and a flagged title shows as leaving for {days} days.",
-      "graceEnforced": "Grace is enforced before deletion. These simulated flags include titles still waiting."
+      "graceEnforced": "Grace is enforced before deletion."
     },
     "progressStatus": "{detail}, {percent}%",
     "queuedRescanTail": "You can leave this page. The numbers here refresh when everything finishes.",
-    "reclaimed": "reclaimed",
+    "reclaimed": "space marked for removal",
     "rescanHeading": "Rescanning to apply your changes",
     "rescanQueuedLead": "A scan was already running, so your changes go into a second scan that starts right after it.",
     "scanStartFailed": "The scan didn't start: {error}",
@@ -2496,7 +2504,8 @@
       "titlesThatChange": "Titles that change"
     },
     "whyTitlesWereSpared": "Why titles were spared",
-    "workingFallback": "Working"
+    "workingFallback": "Working",
+    "graceWaiting": "Includes titles still waiting for grace."
   },
   "policyMeta": {
     "gates": {
@@ -3167,8 +3176,8 @@
     },
     "scanBar": {
       "degradedNotice": "<strong>This scan came back incomplete.</strong> Reaper won't act on it. {reason}",
-      "deltaItems": "{n} {dir, select, up {more} other {fewer}} to remove",
-      "deltaSize": "{n} {dir, select, up {more} other {less}} to free{qualifier}",
+      "deltaItems": "{n} {dir, select, up {more} other {fewer}} marked",
+      "deltaSize": "{n} {dir, select, up {more} other {less}} marked{qualifier}",
       "deltaSummary": "Compared with the scan before: {parts}.",
       "deltaUnknownQualifier": ", {n} {count, plural, one {size} other {sizes}} unknown",
       "editScheduleLabel": "Edit the library scan schedule",
@@ -3187,7 +3196,7 @@
       "queueRefreshed": "Queue refreshed",
       "scanOnlyReads": "A scan only reads. It cannot delete.",
       "scanProblem": "The scan hit a problem: {error}",
-      "snapshotSummary": "{itemCount} items, <condemned>{condemnedCount}</condemned> would be removed, freeing <freed>{freedAmount}</freed>",
+      "snapshotSummary": "{itemCount} items, <condemned>{condemnedCount}</condemned> marked for removal, <freed>{freedAmount}</freed>",
       "step": {
         "active_streams": "active streams",
         "done": "{count, plural, one {# candidate} other {# candidates}}",

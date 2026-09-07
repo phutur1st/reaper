@@ -567,6 +567,7 @@ function Dashboard({ user }: { user: AuthUser }) {
           ) : view === "policy" ? (
             <PolicyEditor
               focus={policyFocus}
+              onGoToReview={() => goTo({ view: "review", lane: "condemn", select: null })}
               mediaType={policyMedia}
               onMediaTypeChange={setPolicyMedia}
               section={policySection}
@@ -614,6 +615,8 @@ function Dashboard({ user }: { user: AuthUser }) {
               jump={settingsFocus}
               // The Lists rows' policy-use links land on the keep-rules card's section.
               onGoToPolicy={() => goToPolicySection("kept")}
+              onGoToGrace={() => goToPolicySection("pace")}
+              onGoToReview={() => goTo({ view: "review", lane: "condemn", select: null })}
             />
           )}
         </Suspense>

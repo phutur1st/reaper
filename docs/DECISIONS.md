@@ -474,7 +474,9 @@ has passed. Missing clocks hold the item. The shared deletion_eligibility partit
 by planning, run counts, confirmation and execution. The executor checks settings and clocks
 again per item. Review rows, season strips, and detail panels read deadlines from the same
 calculation. Countdown display never changes queue membership or a stored hand decision.
-Waiting titles remain condemned and visible on Leaving Soon.
+Waiting titles remain condemned and visible on Leaving Soon. Jobs scan results and Policy
+simulations describe marked totals, not deletion eligibility. Jobs labels the live grace
+setting separately from the historical scan result.
 
 This applies to hand reaps and individual seasons too. An explicit selection containing a
 waiting title refuses instead of silently shrinking; bulk planning omits waiting titles.

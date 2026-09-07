@@ -208,8 +208,10 @@ export function Outcome({
   pace,
   edited,
   mediaType,
+  onGoToReview,
 }: {
   simulation: Simulation;
+  onGoToReview?: (() => void) | undefined;
   threshold: number;
   pace: ProfileSettings | null;
   /** Whether the draft these numbers describe differs from the saved policy. The panel
@@ -242,6 +244,16 @@ export function Outcome({
           <span className="sim-unit">{t("policySim.reclaimed")}</span>
         </div>
       </div>
+
+      {pace?.enforce_grace_period && <p className="help">{t("policySim.graceWaiting")}</p>}
+
+      {onGoToReview && (
+        <p className="help">
+          <button className="link" onClick={onGoToReview}>
+            {t("jobs.grace.reviewLink")}
+          </button>
+        </p>
+      )}
 
       {/* Hand reaps condemn at any threshold, so without this line a maxed-out slider
           beside a nonzero headline reads as the sliders not working. */}
