@@ -466,26 +466,21 @@ refused: it erases the protection during an *arr outage, the exact failure the g
 
 ## Delete mode
 
-**Choice: Grace is a notice by default, with an optional hard deletion gate.**
+**Choice: Grace is notice-only by default, with an optional deletion gate.**
 
-The original notice-only behavior remains the default for compatibility. Enabling
-`enforce_grace_period` requires an existing FirstFlagged clock whose start plus grace_days
-has passed. Missing clocks hold the item. The shared deletion_eligibility partition is used
-by planning, run counts, confirmation and execution. The executor checks settings and clocks
-again per item. Review rows, season strips, and detail panels read deadlines from the same
-calculation. Countdown display never changes queue membership or a stored hand decision.
-Waiting titles remain condemned and visible on Leaving Soon. Jobs scan results and Policy
-simulations describe marked totals, not deletion eligibility. Jobs labels the live grace
-setting separately from the historical scan result. Grace settings, deadlines, null states,
-and waiting totals are described in the served OpenAPI schema for API clients.
+When enabled, `deletion_eligibility` holds items until `first_flagged_at + grace_days`,
+including hand reaps and seasons. Missing clocks hold items. Bulk plans omit waiting items;
+explicit selections containing one are refused. Enabling grace preserves existing start dates
+and the scan's re-entry reset rules. Elapsed time does not prove a notice was delivered.
 
-This applies to hand reaps and individual seasons too. An explicit selection containing a
-waiting title refuses instead of silently shrinking; bulk planning omits waiting titles.
-Existing clocks keep their start dates when enabled, including the existing re-entry reset
-rules. This is elapsed time since flagging, not proof that Plex or Discord delivered a notice.
-Grace remains outside the policy hash, like caps. Tightening it can hold a pending run's items;
-loosening it during execution never expands the run-start membership or relaxes its grace.
-Approval, the canary and all live interlocks remain required. This adds no autonomous deletion.
+Planning, run totals, confirmation and execution share this partition. The executor rechecks
+per item and retains the stricter grace from claim time: loosening settings cannot expand a
+running plan or release its holds. Grace is independent of caps and outside the policy hash.
+Approval and other deletion checks still apply; scheduled jobs never delete media.
+
+Review uses the same deadlines without changing queue membership or hand decisions. Waiting
+titles stay on Leaving Soon. Jobs and Policy show marked totals; Jobs labels current grace
+separately from historical scan results. OpenAPI describes settings, deadlines and null states.
 
 ## Setup readiness
 

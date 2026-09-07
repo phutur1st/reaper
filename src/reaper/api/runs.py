@@ -1034,9 +1034,7 @@ def _settings_out(settings: ProfileSettings, *, recovered: bool = False) -> Prof
 
 @profile_router.get("/profile")
 async def get_profile(request: Request) -> ProfileSettingsIO:
-    """Return the pace settings. These are the caps a run obeys, and
-    the grace window and its optional deletion gate (``services.grace``).
-    Built-in defaults apply until one is saved.
+    """Return saved caps and grace settings, or defaults before the first save.
 
     Reports ``settings_recovered`` when the stored blob was unreadable and
     these are the shipped defaults, so the Pace page can tell the

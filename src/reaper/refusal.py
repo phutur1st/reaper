@@ -656,11 +656,8 @@ MESSAGES: dict[str, str] = {
         "That scan came back incomplete, so Reaper won't act on it. Fix the source and "
         "scan again. {reason}"
     ),
-    "error.plan.grace_waiting": (
-        "Some selected titles are still waiting for grace. Review their countdowns on Reap "
-        "and try again after they end."
-    ),
-    "error.reap.step.grace_waiting": "Grace has not ended or its countdown is missing. Kept.",
+    "error.plan.grace_waiting": "Titles are waiting for grace. Check their countdowns in Review.",
+    "error.reap.step.grace_waiting": "Kept: grace is unfinished or its countdown is missing.",
     "error.plan.selection_empty": "No items were selected to reap.",
     "error.plan.unmeasured_seasons": (
         "Reaper couldn't measure any of the seasons it would remove from {keys}, so "
