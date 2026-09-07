@@ -37,7 +37,7 @@ it.each([
   [false, "2026-01-20T12:00:01Z", "Notice: less than 1 day left"],
   [false, "2026-01-20T12:00:00Z", "Notice complete"],
   [false, null, "Notice countdown missing"],
-  [null, null, "Grace status unavailable, check Pace and limits."],
+  [null, null, "Grace unavailable. Check Pace and limits."],
 ])("renders mode %s and deadline %s honestly", (grace_enforced, grace_ends_at, expected) => {
   render(<GraceBadge item={{ ...item, grace_enforced, grace_ends_at }} />);
   expect(screen.getByText(expected)).toBeInTheDocument();
@@ -54,7 +54,7 @@ it("crosses the deadline without a reload, never showing zero days before expiry
 
 it("shows exact dates in detail views and no countdown on a spared item", () => {
   const view = render(<GraceBadge item={item} exact />);
-  expect(screen.getByText(/Countdown ends/)).toBeInTheDocument();
+  expect(screen.getByText(/Ends/)).toBeInTheDocument();
   view.rerender(<GraceBadge item={{ ...item, override: "spare" }} />);
   expect(view.container).toBeEmptyDOMElement();
 });

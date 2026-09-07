@@ -102,9 +102,8 @@ rescues as failures slanders the policy.
 **Superseded in reasoning, and the code is gone.** The justification above ("still in
 quarantine") described a hold that did not exist at the time: grace was only a notice.
 The later opt-in gate (`grace.deletion_eligibility`) does not validate those replay results.
-What actually spares
-a late play is the executor's live per-item vetoes, which fire on a play *after the plan was
-approved* — not on a boundary N days out. The replay never stopped splitting on the boundary,
+The executor's per-item vetoes catch plays *after the plan was approved*, not at the grace
+boundary. The replay never stopped splitting on that boundary,
 so every `rescued` figure it produced was a best case. It was deleted rather than corrected
 (M3c, dropped), so **the rescue split is not a number Reaper reports anywhere**; #553 is the
 successor and it weighs a returned title down instead of counting it.

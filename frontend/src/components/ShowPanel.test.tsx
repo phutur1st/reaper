@@ -284,7 +284,7 @@ it("shows the grace hold and exact deadline for a hand-reaped season without cha
   try {
     renderPanel(group([waiting]), open);
     expect(screen.getByText("Marked to reap by hand")).toHaveClass("status-reap-held");
-    expect(screen.getByText(/Countdown ends/)).toBeInTheDocument();
+    expect(screen.getByText(/Ends/)).toBeInTheDocument();
     expect(screen.getByText("1 season waiting for grace, 0 grace complete")).toBeInTheDocument();
   } finally {
     fixedClock.mockRestore();

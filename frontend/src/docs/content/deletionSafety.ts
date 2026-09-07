@@ -151,7 +151,7 @@ export const deletionSafety: Doc = {
     ),
     callout(
       "caution",
-      "**Grace is a notice by default.** Enable Wait for grace before deleting under Policy, Pace and limits to make it a deletion hold, including hand reaps and seasons. Missing clocks keep the file. Existing countdowns retain their start dates. Every deletion still needs your approval, and every other safety check still applies.",
+      "**Grace is notice-only by default.** Enable **Wait for grace before deleting** in Policy → Pace and limits to hold movies and seasons, including hand reaps. Missing countdowns hold items; existing ones do not restart. Approval and safety checks still apply.",
     ),
 
     h2("Sharp edges", "edges"),
