@@ -2862,7 +2862,7 @@ export function ReviewQueue({
                 components={{ itemsNum: <strong />, sizeNum: <strong />, unknownNum: <strong /> }}
               />
               {!activeCollection && verdict === "condemn" && queueGraceEnforced && (
-                <> {t("reviewGrace.queueIncludesWaiting")}</>
+                <>. {t("reviewGrace.queueIncludesWaiting")}</>
               )}
             </p>
             <div className={`card-list ${selectMode ? "card-list-selecting has-bulk-bar" : ""}`}>

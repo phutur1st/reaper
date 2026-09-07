@@ -2454,8 +2454,6 @@ it("shows the movie countdown and qualifies the review total before grace", asyn
   );
   renderQueue();
   expect(await screen.findByText("Countdown missing, held")).toBeInTheDocument();
-  expect(
-    screen.getByText(/Marked for removal, including titles waiting for grace\./),
-  ).toBeInTheDocument();
+  expect(screen.getByText(/Includes titles waiting for grace\./)).toBeInTheDocument();
   expect(screen.queryByText(/would be freed/)).not.toBeInTheDocument();
 });
