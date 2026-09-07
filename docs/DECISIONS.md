@@ -476,7 +476,8 @@ again per item. Review rows, season strips, and detail panels read deadlines fro
 calculation. Countdown display never changes queue membership or a stored hand decision.
 Waiting titles remain condemned and visible on Leaving Soon. Jobs scan results and Policy
 simulations describe marked totals, not deletion eligibility. Jobs labels the live grace
-setting separately from the historical scan result.
+setting separately from the historical scan result. Grace settings, deadlines, null states,
+and waiting totals are described in the served OpenAPI schema for API clients.
 
 This applies to hand reaps and individual seasons too. An explicit selection containing a
 waiting title refuses instead of silently shrinking; bulk planning omits waiting titles.

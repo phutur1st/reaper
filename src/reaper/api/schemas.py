@@ -178,10 +178,18 @@ class GroupSeasonMarkOut(BaseModel):
     shows it unnumbered instead of dropping it. Display extraction never errors a row off
     the queue."""
 
-    grace_enforced: bool | None = None
-    """Live grace mode. None means the stored settings could not be read."""
-    grace_ends_at: str | None = None
-    """UTC deadline from the deletion gate's clock, or None when unavailable."""
+    grace_enforced: bool | None = Field(
+        default=None,
+        description="Current grace mode: true blocks deletion before the deadline; false is "
+        "notice only; null means the saved settings could not be read. Review membership "
+        "and stored hand decisions are unchanged by this field.",
+    )
+    grace_ends_at: str | None = Field(
+        default=None,
+        description="UTC ISO 8601 deadline: first-flagged time plus the current grace_days. "
+        "Null means no reliable countdown; enforced grace holds such items. At or after "
+        "this deadline grace permits deletion, but approval and other deletion checks still apply.",
+    )
     id: int
     """The candidate id for this season, so clicking its square opens that season's own
     reasoning (not the whole show's panel)."""
@@ -213,10 +221,18 @@ class GroupSeasonMarkOut(BaseModel):
 
 
 class CandidateOut(BaseModel):
-    grace_enforced: bool | None = None
-    """Live grace mode. None means the stored settings could not be read."""
-    grace_ends_at: str | None = None
-    """UTC deadline from the deletion gate's clock, or None when unavailable."""
+    grace_enforced: bool | None = Field(
+        default=None,
+        description="Current grace mode: true blocks deletion before the deadline; false is "
+        "notice only; null means the saved settings could not be read. Review membership "
+        "and stored hand decisions are unchanged by this field.",
+    )
+    grace_ends_at: str | None = Field(
+        default=None,
+        description="UTC ISO 8601 deadline: first-flagged time plus the current grace_days. "
+        "Null means no reliable countdown; enforced grace holds such items. At or after "
+        "this deadline grace permits deletion, but approval and other deletion checks still apply.",
+    )
     id: int
     media_key: str
     title: str
@@ -501,8 +517,18 @@ class ProfileSettingsIO(BaseModel):
     max_items_per_30d: int = Field(ge=1)
     max_bytes_per_30d: int = Field(ge=1)
     caps_enabled: bool = True
-    grace_days: int = Field(ge=7)
-    enforce_grace_period: bool = False
+    grace_days: int = Field(
+        ge=7,
+        description="Grace duration in days from the existing first-flagged timestamp. "
+        "Changing this value does not restart the clock. Minimum 7 days.",
+    )
+    enforce_grace_period: bool = Field(
+        default=False,
+        description="False (default) keeps grace notice-only. True blocks planning and deletion "
+        "until first-flagged time plus grace_days has elapsed, including hand reaps and seasons. "
+        "Missing clocks hold the item. Existing clocks retain their start dates. "
+        "The executor rechecks grace per item; approval and other deletion checks still apply.",
+    )
     max_unmeasured_per_run: int = Field(default=0, ge=0, le=25)
     """How many items with no size one run may delete. The GB caps cannot bound them, so
     this count is the only bound there is. Defaults to 0: never."""
@@ -1380,7 +1406,10 @@ class SignalCountOut(BaseModel):
 class GraceWaitingItemOut(BaseModel):
     candidate_id: int
     title: str
-    grace_ends_at: datetime | None
+    grace_ends_at: datetime | None = Field(
+        description="UTC grace deadline. Null means no reliable clock, so the item is held. "
+        "Passing this deadline does not replace approval or other deletion checks."
+    )
 
 
 class ReapBreakdownOut(BaseModel):
@@ -1393,9 +1422,18 @@ class ReapBreakdownOut(BaseModel):
     first scan, when every figure is zero."""
 
     has_snapshot: bool
-    grace_enforced: bool = False
-    grace_waiting: list[GraceWaitingItemOut] = Field(default_factory=list)
-    grace_waiting_bytes: int = 0
+    grace_enforced: bool = Field(
+        default=False, description="Whether the current grace deletion gate is enabled."
+    )
+    grace_waiting: list[GraceWaitingItemOut] = Field(
+        default_factory=list,
+        description="Movies and individual seasons excluded from deletion by enforced grace, "
+        "including missing clocks. These remain visible in Review and are excluded from will_reap.",
+    )
+    grace_waiting_bytes: int = Field(
+        default=0,
+        description="Known bytes for grace_waiting items. Unknown sizes are omitted.",
+    )
     policy_condemned: int
     policy_condemned_bytes: int
     hand_spared: int
