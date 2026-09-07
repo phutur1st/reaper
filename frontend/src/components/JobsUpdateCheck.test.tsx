@@ -4,8 +4,9 @@
 // chip's light all read `["update"]`, which holds its answer for half an hour and has nothing
 // else to invalidate it. So a finished run has to refresh that query, or the two surfaces
 // disagree about the same fact with the newer one on the page the operator is not looking at.
+import { DEFAULT_PROFILE } from "../test/apiFixtures";
 import type { QueryClient } from "@tanstack/react-query";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { About, Schedule, ScheduledJob } from "../api";
 import { expectNoA11yViolations } from "../test/a11y";
@@ -57,6 +58,7 @@ function schedule(job: Partial<ScheduledJob>): Schedule {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  apiMock.profile.mockResolvedValue(DEFAULT_PROFILE);
   apiMock.about.mockResolvedValue(ABOUT);
   apiMock.update.mockResolvedValue(DEFAULT_UPDATE);
   apiMock.safety.mockResolvedValue({ destructive_enabled: false, dry_run: true, reason: null });
@@ -137,4 +139,72 @@ describe("the update check's Jobs row", () => {
 
     expect(apiMock.update).toHaveBeenCalledTimes(1);
   });
+});
+
+it.each([21, 35])("shows the current enforced grace duration of %s days", async (days) => {
+  apiMock.schedule.mockResolvedValue(schedule({}));
+  apiMock.profile.mockResolvedValue({
+    ...DEFAULT_PROFILE,
+    enforce_grace_period: true,
+    grace_days: days,
+  });
+  renderJobs();
+  expect(
+    await screen.findByText(`Current policy: Grace enforced, ${days} days.`),
+  ).toBeInTheDocument();
+});
+
+it("distinguishes notice-only timing from a deletion hold", async () => {
+  apiMock.schedule.mockResolvedValue(schedule({}));
+  apiMock.profile.mockResolvedValue({ ...DEFAULT_PROFILE, enforce_grace_period: false });
+  renderJobs();
+  expect(
+    await screen.findByText("Current policy: Grace is notice only; it does not block deletion."),
+  ).toBeInTheDocument();
+});
+
+it("does not claim a grace mode while the profile is loading", async () => {
+  apiMock.schedule.mockResolvedValue(schedule({}));
+  apiMock.profile.mockReturnValue(new Promise(() => {}));
+  renderJobs();
+  expect(await screen.findByText("Reading current grace policy…")).toBeInTheDocument();
+  expect(screen.queryByText(/Current policy:/)).not.toBeInTheDocument();
+});
+
+it.each(["failed", "recovered"])(
+  "does not claim grace enforcement from a %s profile",
+  async (state) => {
+    apiMock.schedule.mockResolvedValue(schedule({}));
+    if (state === "failed") apiMock.profile.mockRejectedValue(new Error("Unavailable"));
+    else
+      apiMock.profile.mockResolvedValue({
+        ...DEFAULT_PROFILE,
+        enforce_grace_period: true,
+        settings_recovered: true,
+      });
+    renderJobs();
+    expect(
+      await screen.findByText("Grace status unavailable. Check Pace and limits."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Current policy:/)).not.toBeInTheDocument();
+  },
+);
+
+it("replaces a previously confirmed grace mode when its refresh fails", async () => {
+  apiMock.schedule.mockResolvedValue(schedule({}));
+  apiMock.profile.mockResolvedValue({
+    ...DEFAULT_PROFILE,
+    enforce_grace_period: true,
+    grace_days: 21,
+  });
+  const client = renderJobs();
+  expect(await screen.findByText("Current policy: Grace enforced, 21 days.")).toBeInTheDocument();
+  apiMock.profile.mockRejectedValue(new Error("Unavailable"));
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["profile"] });
+  });
+  expect(
+    await screen.findByText("Grace status unavailable. Check Pace and limits."),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/Current policy:/)).not.toBeInTheDocument();
 });

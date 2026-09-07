@@ -13,6 +13,7 @@
 // The words shown must be the server's own sentence, not one composed from the response's
 // counts and flags: composing locally can say the shelves failed while the stored row it sits
 // on is green, when no library is turned on.
+import { DEFAULT_PROFILE } from "../test/apiFixtures";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -82,6 +83,7 @@ function shelf(over: Partial<LeavingSoonSettings> = {}): LeavingSoonSettings {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  apiMock.profile.mockResolvedValue(DEFAULT_PROFILE);
   apiMock.about.mockResolvedValue(null);
   apiMock.update.mockResolvedValue(DEFAULT_UPDATE);
   apiMock.safety.mockResolvedValue({ destructive_enabled: false, dry_run: true, reason: null });
