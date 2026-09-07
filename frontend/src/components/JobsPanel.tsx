@@ -633,7 +633,15 @@ function LeavingSoonRow({
   );
 }
 
-export function JobsPanel({ onGoToPlex }: { onGoToPlex: () => void }) {
+export function JobsPanel({
+  onGoToPlex,
+  onGoToGrace,
+  onGoToReview,
+}: {
+  onGoToPlex: () => void;
+  onGoToGrace?: (() => void) | undefined;
+  onGoToReview?: (() => void) | undefined;
+}) {
   const { t } = useTranslation();
   const { data: snapshot } = useQuery({
     queryKey: ["snapshot"],
@@ -675,6 +683,8 @@ export function JobsPanel({ onGoToPlex }: { onGoToPlex: () => void }) {
     { what: t("jobs.staleRead.shelfNoun"), stale: shelf.isError && !!shelf.data },
   ]);
 
+  const profile = useQuery({ queryKey: ["profile"], queryFn: api.profile });
+
   const jobsById = new Map<string, ScheduledJob>((schedule.data?.jobs ?? []).map((j) => [j.id, j]));
   const scanJob = jobsById.get(SCAN_ID);
 
@@ -713,6 +723,33 @@ export function JobsPanel({ onGoToPlex }: { onGoToPlex: () => void }) {
           scheduleText={scanScheduleText(scanJob, schedule.isError)}
           onEdit={() => scanJob && setEditing(scanJob)}
           canEdit={!!scanJob}
+          graceStatus={
+            <>
+              <div className="jobrow-meta">
+                {profile.isPending
+                  ? t("jobs.grace.loading")
+                  : profile.isError || !profile.data || profile.data.settings_recovered
+                    ? t("jobs.grace.unavailable")
+                    : profile.data.enforce_grace_period
+                      ? t("jobs.grace.enforced", { n: profile.data.grace_days })
+                      : t("jobs.grace.notice")}
+              </div>
+              {onGoToGrace && (
+                <div className="jobrow-link">
+                  <button className="link" onClick={onGoToGrace}>
+                    {t("jobs.grace.policyLink")}
+                  </button>
+                </div>
+              )}
+              {onGoToReview && (
+                <div className="jobrow-link">
+                  <button className="link" onClick={onGoToReview}>
+                    {t("jobs.grace.reviewLink")}
+                  </button>
+                </div>
+              )}
+            </>
+          }
         />
         <LeavingSoonRow onGoToPlex={onGoToPlex} plan={stale} />
         {/* Render the upkeep jobs from the server's own list (scan aside; it has its own

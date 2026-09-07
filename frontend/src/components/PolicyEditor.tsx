@@ -1424,6 +1424,7 @@ export function PolicyEditor({
   onMediaTypeChange,
   section,
   onSectionChange,
+  onGoToReview,
 }: {
   /** A cross-page jump target ("Turn it on in Policy → Deletion" lands on the Deletion
    *  section). The nonce makes each jump fire once, however often the caller re-renders, and it
@@ -1445,6 +1446,7 @@ export function PolicyEditor({
   section: PolicySectionId;
   /** Reported on a rail click, on a jump, and as the page is scrolled past a heading. */
   onSectionChange: (next: PolicySectionId) => void;
+  onGoToReview?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -3003,6 +3005,7 @@ export function PolicyEditor({
           simulation.exact ? (
             <Outcome
               simulation={simulation}
+              onGoToReview={onGoToReview}
               threshold={draft.condemn_at}
               pace={pace}
               edited={simulatedIsEdited && simulationIsSettled}

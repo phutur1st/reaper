@@ -11,7 +11,7 @@
 // Reaper's own database. GuardedTransport would refuse a mutating call even if one were tried.
 
 import { useIsFetching, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { announce } from "../announce";
 import { api, type ScheduledJob, type Snapshot } from "../api";
@@ -103,6 +103,7 @@ export function ScanRow({
   scheduleText,
   onEdit,
   canEdit,
+  graceStatus,
 }: {
   snapshot: Snapshot | undefined;
   /** The scan's own schedule entry. Carries `last_run_at`, `last_ok`, and
@@ -114,6 +115,7 @@ export function ScanRow({
   scheduleText: string;
   onEdit: () => void;
   canEdit: boolean;
+  graceStatus?: ReactNode;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -320,6 +322,8 @@ export function ScanRow({
         ) : (
           <div className="jobrow-sched">{scheduleText}</div>
         )}
+
+        {graceStatus}
 
         {start.error && (
           <Notice tone="error" inline>

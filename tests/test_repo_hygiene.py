@@ -3776,7 +3776,7 @@ _QUERY_FAILURE_HANDLES = {
     "frontend/src/components/DeletionToggle.tsx": 1,
     "frontend/src/components/Fairness.tsx": 1,
     "frontend/src/components/GeneralPanel.tsx": 1,
-    "frontend/src/components/JobsPanel.tsx": 2,
+    "frontend/src/components/JobsPanel.tsx": 3,
     # Whether each protection list is still protecting anything. Undivided on purpose, like
     # the safety reads above: this screen exists so an operator can tell a list that stopped
     # working from one that is simply not on a title's side, so an unreadable answer must say
@@ -4049,7 +4049,7 @@ def test_every_query_failure_branch_is_counted() -> None:
 #                            word, and dropping it by hand is how a matcher starts lying about
 #                            its own scope
 #   GeneralPanel.tsx (1)     the general settings' never-loaded branch
-#   JobsPanel.tsx (2)        two never-loaded branches, the upkeep jobs and the shelf status
+#   JobsPanel.tsx (3)        two never-loaded branches; grace mode fails closed on any error
 #   NotInScanPanel.tsx (1)   a read-only panel with no draft, on the arm where the list never
 #                            landed
 #   PlexPanel.tsx (1)        the panel's own never-loaded status read

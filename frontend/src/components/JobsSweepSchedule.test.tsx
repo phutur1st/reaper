@@ -8,6 +8,7 @@
 // Both are pinned against the server's real default (`DEFAULT_MAINTENANCE_CRONS` in
 // services/scheduler.py). A fixture inventing its own cron would prove the formatter works on
 // a shape Reaper does not ship.
+import { DEFAULT_PROFILE } from "../test/apiFixtures";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,6 +50,7 @@ function schedule(job: Partial<ScheduledJob> = {}): Schedule {
 }
 
 beforeEach(() => {
+  apiMock.profile.mockResolvedValue(DEFAULT_PROFILE);
   apiMock.about.mockResolvedValue({
     version: "2026.8.1",
     license: "AGPL-3.0-or-later",
