@@ -215,3 +215,33 @@ class TestOneProducerOfTheSchema:
         assert [t["name"] for t in served.get("tags", ())] == list(api_tags.ALL)
         assert "x-tagGroups" in served
         assert "ApiKey" in served.get("components", {}).get("securitySchemes", {})
+
+
+@pytest.mark.parametrize("model", ["CandidateOut", "CandidateDetail", "GroupSeasonMarkOut"])
+def test_review_grace_fields_are_documented_in_served_schema(
+    schema: dict[str, Any], model: str
+) -> None:
+    props = schema["components"]["schemas"][model]["properties"]
+    mode = props["grace_enforced"]["description"].lower()
+    for state in ("true", "false", "null"):
+        assert state in mode
+    deadline = props["grace_ends_at"]["description"].lower()
+    for term in ("utc", "null", "first-flagged", "approval"):
+        assert term in deadline
+
+
+def test_grace_setting_and_breakdown_are_documented_in_served_schema(
+    schema: dict[str, Any],
+) -> None:
+    models = schema["components"]["schemas"]
+    profile = models["ProfileSettingsIO"]["properties"]
+    flag = profile["enforce_grace_period"]
+    assert flag["default"] is False
+    for term in ("notice-only", "hand reaps", "missing clocks", "rechecks"):
+        assert term in flag["description"].lower()
+    assert "restart" in profile["grace_days"]["description"]
+    breakdown = models["ReapBreakdownOut"]["properties"]
+    for field in ("grace_enforced", "grace_waiting", "grace_waiting_bytes"):
+        assert breakdown[field]["description"]
+    assert "will_reap" in breakdown["grace_waiting"]["description"]
+    assert "Null" in models["GraceWaitingItemOut"]["properties"]["grace_ends_at"]["description"]
