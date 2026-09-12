@@ -9,6 +9,7 @@
 // absence on their own, which "defaults when storage is unusable" exercises.
 
 import { beforeEach, describe, expect, it } from "vitest";
+import { initialFilters, filtersToQuery } from "./queueFilters";
 import { DEFAULT_FILTERS, loadFilters, saveFilters, type QueueFilters } from "./ReviewQueue";
 
 const store = new Map<string, string>();
@@ -37,6 +38,7 @@ describe("remembered filters", () => {
 
   it("round-trips what was saved, per tab", () => {
     const chosen: QueueFilters = {
+      grace: "complete",
       mediaType: "season",
       requested: "yes",
       genre: "Comedy",
@@ -73,4 +75,22 @@ describe("remembered filters", () => {
     // And saving is a quiet no-op, never a crash.
     expect(() => saveFilters("condemn", DEFAULT_FILTERS)).not.toThrow();
   });
+});
+
+it("drops grace off other lanes and preserves valid siblings beside an invalid grace value", () => {
+  installStorage();
+  saveFilters("protect", { ...DEFAULT_FILTERS, grace: "complete", genre: "Drama" });
+  expect(loadFilters("protect")).toEqual({ ...DEFAULT_FILTERS, genre: "Drama" });
+  store.set("reaper.queue.filters.condemn", JSON.stringify({ grace: "ready", genre: "Drama" }));
+  expect(loadFilters("condemn")).toEqual({ ...DEFAULT_FILTERS, genre: "Drama" });
+});
+
+it("round-trips linked grace with other filters and ignores it outside Condemned", () => {
+  installStorage();
+  store.clear();
+  const chosen = { ...DEFAULT_FILTERS, grace: "complete" as const, requested: "yes" as const };
+  const query = filtersToQuery("Example", chosen);
+  expect(initialFilters("condemn", query)).toEqual(chosen);
+  expect(initialFilters("protect", query)).toEqual({ ...chosen, grace: "any" });
+  expect(initialFilters("condemn", "?grace=waiting&grace=complete").grace).toBe("any");
 });

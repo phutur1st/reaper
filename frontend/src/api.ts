@@ -248,6 +248,8 @@ export interface Group {
  *  show's seasons and not the rest, and these numbers sit beside "Reap now". */
 export interface GroupRollup {
   group_key: string;
+  /** Full filtered season set, before pagination; null without a grace filter. */
+  matching_keys?: string[] | null;
   /** How many seasons "Reap now" on this show would plan: its condemned, not-spared
    *  seasons, plus the hand reaps the engine honors. */
   condemned_count: number;
@@ -263,6 +265,7 @@ export interface GroupRollup {
 /** One page of candidates, plus the full-set totals the server measured before the
  *  page window. The queue header uses these totals for its counts and sizes. */
 export interface CandidatePage {
+  grace_enforced?: boolean | null;
   items: Candidate[];
   /** One entry per show with a row on this page. A show straddling two pages appears in
    *  both with the same figures, so merging pages by `group_key` cannot leave a partial
@@ -280,12 +283,14 @@ export interface CandidatePage {
   snapshot_id: number | null;
 }
 
+export type GraceFilter = "any" | "waiting" | "complete" | "unavailable";
 export type RequestedFilter = "any" | "yes" | "no";
 export type OverrideFilter = "any" | "spare" | "reap" | "none";
 export type SortKey = "score" | "size" | "year" | "title";
 export type SortOrder = "asc" | "desc";
 
 export interface CandidateQuery {
+  grace_status?: GraceFilter;
   search?: string;
   media_type?: string;
   requested?: RequestedFilter;
@@ -2133,6 +2138,7 @@ export const api = {
     if (q.collection) params.set("collection", q.collection);
     if (q.library) params.set("library", q.library);
     if (q.override && q.override !== "any") params.set("override", q.override);
+    if (q.grace_status && q.grace_status !== "any") params.set("grace_status", q.grace_status);
     if (q.sort) params.set("sort", q.sort);
     if (q.order) params.set("order", q.order);
     params.set("limit", String(limit));

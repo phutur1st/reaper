@@ -18,12 +18,12 @@ from __future__ import annotations
 import enum
 import json
 import re
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, NamedTuple, cast
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, cast
 
 import structlog
 from fastapi import APIRouter, Query, Request
-from sqlalchemy import and_, asc, case, desc, func, null, or_, select, text
+from sqlalchemy import and_, asc, case, desc, false, func, null, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
@@ -47,6 +47,7 @@ from reaper.api.schemas import (
     SnapshotOut,
     thaw_threshold,
 )
+from reaper.clock import utcnow
 from reaper.db import KEY_CHUNK
 from reaper.db.models import (
     Candidate,
@@ -358,6 +359,15 @@ async def list_candidates(
     collection: str | None = None,
     library: str | None = None,
     override: str = "any",
+    grace_status: Annotated[
+        Literal["any", "waiting", "complete", "unavailable"],
+        Query(
+            description="Countdown status on the condemned lane. Waiting has a future deadline; "
+            "complete has elapsed; unavailable has no reliable countdown. ANDed with other "
+            "filters before pagination. Ignored on other lanes. With grace off, filters notices "
+            "only. Complete does not bypass approval or safety checks."
+        ),
+    ] = "any",
     sort: str = "score",
     order: str = "desc",
     limit: int = Query(100, ge=1, le=500),
@@ -420,6 +430,7 @@ async def list_candidates(
         # The filters, built once and applied to BOTH the count and the page, so the envelope's
         # totals describe exactly the set the rows are drawn from.
         decisions = await whitelist.overrides(session)
+        grace_profile = await active_profile(session)
         conditions = [Candidate.snapshot_id == snapshot.id]
         if verdict != "any":
             # Tab membership is the effective lane, not the raw verdict. A hand override moves
@@ -439,6 +450,36 @@ async def list_candidates(
             if moved_in:
                 lane = or_(lane, Candidate.media_key.in_(moved_in))
             conditions.append(lane)
+        if verdict == "condemn" and grace_status != "any":
+            # Compare the stored start against the same window as grace_deadline, without
+            # materializing the library or binding one parameter per matching item.
+            cutoff = grace_deadline(utcnow(), -grace_profile.settings.grace_days)
+            latest_start = grace_deadline(
+                datetime.max.replace(tzinfo=UTC, microsecond=0), -grace_profile.settings.grace_days
+            )
+            reliable = (
+                FirstFlagged.first_flagged_at <= latest_start
+                if latest_start is not None and not grace_profile.repaired
+                else false()
+            )
+            clock = select(FirstFlagged.media_key).where(
+                FirstFlagged.media_key == Candidate.media_key,
+                reliable,
+            )
+            if grace_status == "unavailable":
+                conditions.append(~clock.exists())
+            elif grace_status == "complete":
+                conditions.append(
+                    clock.where(
+                        FirstFlagged.first_flagged_at <= cutoff if cutoff is not None else false()
+                    ).exists()
+                )
+            else:
+                conditions.append(
+                    clock.where(
+                        FirstFlagged.first_flagged_at > cutoff if cutoff is not None else reliable
+                    ).exists()
+                )
         search_rank: ColumnElement[int] | None = None
         matched_collection: ColumnElement[str] | None = None
         if search and search.strip():
@@ -638,13 +679,25 @@ async def list_candidates(
             .all()
         }
         expiries = await whitelist.spare_expiries(session)
-        grace_profile = await active_profile(session)
         group_keys = {r.group_key for r in rows if r.group_key}
         group_totals, group_marks = await _group_rollups(
             session, snapshot.id, group_keys, decisions, expiries
         )
 
+        matching_keys: dict[str, list[str]] = {}
+        if verdict == "condemn" and grace_status != "any" and group_keys:
+            for group_key, media_key in await session.execute(
+                select(Candidate.group_key, Candidate.media_key).where(
+                    *conditions,
+                    Candidate.group_key.in_(group_keys),  # Bounded by the 500-row page.
+                )
+            ):
+                matching_keys.setdefault(group_key, []).append(media_key)
+
         return CandidatePageOut(
+            grace_enforced=None
+            if grace_profile.repaired
+            else grace_profile.settings.enforce_grace_period,
             items=[
                 _candidate_out(
                     r,
@@ -662,6 +715,7 @@ async def list_candidates(
             groups=[
                 GroupRollupOut(
                     group_key=key,
+                    matching_keys=matching_keys.get(key),
                     condemned_count=group_totals[key][0],
                     condemned_bytes=group_totals[key][1],
                     unknown_size=group_totals[key][2],

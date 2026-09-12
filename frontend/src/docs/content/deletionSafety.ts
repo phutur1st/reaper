@@ -154,6 +154,10 @@ export const deletionSafety: Doc = {
       "**Grace is notice-only by default.** Enable **Wait for grace before deleting** in Policy → Pace and limits to hold movies and seasons, including hand reaps. Missing countdowns hold items; existing ones do not restart. Approval and safety checks still apply.",
     ),
 
+    p(
+      "In Condemned, use **Filter → Grace status** to find waiting, complete, or unavailable countdowns. It combines with your other filters. With grace off, it is **Notice status**. Bulk actions cover matching seasons; whole-show controls still cover the show.",
+    ),
+
     h2("Sharp edges", "edges"),
     ul([
       "**A scripted deploy can start armed.** The password gate covers the switch in the app. You can turn deletion on at first boot without a password by setting `REAPER_DESTRUCTIVE_ACTIONS_ENABLED=true` in the environment. This is meant for infrastructure-as-code installs.",
