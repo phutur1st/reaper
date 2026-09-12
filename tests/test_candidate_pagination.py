@@ -173,6 +173,7 @@ def test_before_the_first_scan_the_page_is_whole(unscanned_client: TestClient) -
     """
     page = unscanned_client.get("/api/candidates?verdict=condemn&offset=40").json()
     assert page == {
+        "grace_enforced": None,
         "items": [],
         "groups": [],
         "total": 0,
