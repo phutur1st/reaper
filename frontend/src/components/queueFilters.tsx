@@ -6,7 +6,7 @@
 // draws these lives with the queue.
 
 import type { ReactNode } from "react";
-import type { OverrideFilter, RequestedFilter, SortKey, SortOrder } from "../api";
+import type { GraceFilter, OverrideFilter, RequestedFilter, SortKey, SortOrder } from "../api";
 import i18next from "../i18n";
 
 // Each a function, not a module-level constant: the labels come from the catalog, and a
@@ -30,6 +30,12 @@ export const overrideFilters = (): { value: OverrideFilter; label: string }[] =>
   { value: "spare", label: i18next.t("reviewQueue.filterOptions.override.spare") },
   { value: "reap", label: i18next.t("reviewQueue.filterOptions.override.reap") },
   { value: "none", label: i18next.t("reviewQueue.filterOptions.override.none") },
+];
+
+export const graceFilters = (): { value: GraceFilter; label: string }[] => [
+  { value: "waiting", label: i18next.t("reviewGrace.filter.waiting") },
+  { value: "complete", label: i18next.t("reviewGrace.filter.complete") },
+  { value: "unavailable", label: i18next.t("reviewGrace.filter.unavailable") },
 ];
 
 export const sorts = (): { value: SortKey; label: string }[] => [
@@ -59,6 +65,7 @@ export interface FilterDimension {
 // Each queue tab keeps its own filters and sort, on this device, until changed or cleared.
 
 export interface QueueFilters {
+  grace: GraceFilter;
   mediaType: string;
   requested: RequestedFilter;
   genre: string;
@@ -69,6 +76,7 @@ export interface QueueFilters {
 }
 
 export const DEFAULT_FILTERS: QueueFilters = {
+  grace: "any",
   mediaType: "",
   requested: "any",
   genre: "",
@@ -88,6 +96,7 @@ function sanitize(stored: Partial<Record<keyof QueueFilters, unknown>>): QueueFi
   const pick = <T,>(value: unknown, allowed: readonly T[], fallback: T): T =>
     allowed.includes(value as T) ? (value as T) : fallback;
   return {
+    grace: pick(stored.grace, ["any", ...graceFilters().map((f) => f.value)], "any"),
     mediaType: pick(
       stored.mediaType,
       mediaFilters().map((f) => f.value),
@@ -131,13 +140,15 @@ export function loadFilters(verdict: string): QueueFilters {
   } catch {
     return { ...DEFAULT_FILTERS };
   }
-  return sanitize((parsed ?? {}) as Partial<Record<keyof QueueFilters, unknown>>);
+  const filters = sanitize((parsed ?? {}) as Partial<Record<keyof QueueFilters, unknown>>);
+  return verdict === "condemn" ? filters : { ...filters, grace: "any" };
 }
 
 /** The filters that travel in a link, keyed on `QueueFilters` so a new dimension has to answer
  *  here before the app compiles. Sort is not one of them: it is not a dimension (it hides
  *  nothing), and it stays with the device that chose it, the same way `clearFilters` keeps it. */
 const LINKED: Record<Exclude<keyof QueueFilters, "sort" | "order">, true> = {
+  grace: true,
   mediaType: true,
   library: true,
   requested: true,
@@ -177,6 +188,7 @@ export function initialFilters(verdict: string, search: string): QueueFilters {
   const one = (key: string) => (params.getAll(key).length > 1 ? null : params.get(key));
   return {
     ...sanitize(Object.fromEntries(named.map((key) => [key, one(key)]))),
+    ...(verdict !== "condemn" ? { grace: "any" as const } : {}),
     sort: stored.sort,
     order: stored.order,
   };

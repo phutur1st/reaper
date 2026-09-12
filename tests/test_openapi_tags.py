@@ -245,3 +245,13 @@ def test_grace_setting_and_breakdown_are_documented_in_served_schema(
         assert breakdown[field]["description"]
     assert "will_reap" in breakdown["grace_waiting"]["description"]
     assert "Null" in models["GraceWaitingItemOut"]["properties"]["grace_ends_at"]["description"]
+
+
+def test_grace_filter_is_documented_in_served_schema(schema: dict[str, Any]) -> None:
+    params = schema["paths"]["/api/candidates"]["get"]["parameters"]
+    grace = next(param for param in params if param["name"] == "grace_status")
+    assert grace["schema"]["enum"] == ["any", "waiting", "complete", "unavailable"]
+    assert grace["schema"]["default"] == "any"
+    assert "before pagination" in grace["description"]
+    props = schema["components"]["schemas"]["GroupRollupOut"]["properties"]
+    assert "Bulk actions" in props["matching_keys"]["description"]

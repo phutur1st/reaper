@@ -79,7 +79,7 @@ A **†** marks a row whose reasoning is a section of the same name in `docs/DEC
 | A rebuilt source | **Tautulli's total aborts the scan, Plex's reissued keys degrade it** |
 | Why-panel scope | **Renders for keeps as well as deletes** † |
 | Server copy | **The server states facts, the browser says words** † |
-| Delete mode | **Optional grace gate, countdowns in Review** † |
+| Delete mode | **Optional grace gate, Review countdowns and filters** † |
 | Autonomy | **If ever built**: an earned grant keyed to `policy_hash`, any edit revokes it |
 | Caps | **Four**: items + bytes, per-run + rolling 30-day |
 | Scan after a reap | **Waits for Plex's scans; holds reaps too**, 3 h cap, lost on restart |
