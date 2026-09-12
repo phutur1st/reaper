@@ -1181,5 +1181,8 @@
   "reviewGrace.grace.summary": "n counts seasons held by grace, including missing clocks. complete counts condemned seasons whose grace ended.",
   "reviewGrace.notice.summary": "n counts condemned seasons with an unfinished or missing notice countdown. complete counts ended notices. No deletion hold is implied.",
   "reviewGrace.markedOfTotal": "n is condemned seasons; total is all seasons; size is formatted space. Includes grace holds.",
-  "jobs.grace.enforced": "n is the saved grace duration in days. Shown only when enforced; describes current policy, not the last scan."
+  "jobs.grace.enforced": "n is the saved grace duration in days. Shown only when enforced; describes current policy, not the last scan.",
+  "reviewGrace.filter.matches": "Shown on a show card with a grace filter. n is the number of seasons matching all active filters, across all pages; total includes every season in the show.",
+  "reviewGrace.filter.graceChip": "Active grace filter chip. status is the translated Waiting, Complete, or Unavailable option.",
+  "reviewGrace.filter.noticeChip": "Active notice-only filter chip. status is the translated Waiting, Complete, or Unavailable option."
 }

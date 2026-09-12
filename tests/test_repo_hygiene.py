@@ -6513,8 +6513,8 @@ def _membership_sites(root: Path) -> dict[str, _Membership]:
 #: site count, so a filter added beside a classified one cannot ride its line.
 _MEMBERSHIP_INVENTORY: dict[str, tuple[int, str]] = {
     "src/reaper/api/review.py::list_candidates": (
-        5,
-        "bounded: four over the operator's hand overrides, one over the page (limit le=500)",
+        6,
+        "bounded: four over hand overrides, two over page rows or groups (limit le=500)",
     ),
     "src/reaper/api/review.py::_group_rollups": (2, "chunked"),
     "src/reaper/api/review.py::_decided_keys": (2, "chunked"),

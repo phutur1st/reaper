@@ -2454,6 +2454,103 @@ it("shows the movie countdown and qualifies the review total before grace", asyn
   );
   renderQueue();
   expect(await screen.findByText("Countdown missing, held")).toBeInTheDocument();
-  expect(screen.getByText(/Includes titles waiting for grace\./)).toBeInTheDocument();
+  expect(screen.getByText(/Grace and safety checks still apply\./)).toBeInTheDocument();
   expect(screen.queryByText(/would be freed/)).not.toBeInTheDocument();
+});
+
+describe("grace filtering", () => {
+  afterEach(() => forgetFilters());
+
+  it("adds grace alongside an existing filter and clears only grace", async () => {
+    apiMock.candidates.mockResolvedValue({ ...page([movie(1)]), grace_enforced: true });
+    window.localStorage.setItem(
+      filtersKey("condemn"),
+      JSON.stringify({ ...DEFAULT_FILTERS, requested: "yes" }),
+    );
+    const user = userEvent.setup();
+    renderQueue();
+    await screen.findByText("Example Movie 1");
+    await user.click(screen.getByRole("button", { name: "Filter" }));
+    await user.click(screen.getByRole("button", { name: "Grace status" }));
+    await waitFor(() =>
+      expect(apiMock.candidates).toHaveBeenCalledWith(
+        "condemn",
+        expect.objectContaining({ requested: "yes", grace_status: "waiting" }),
+        100,
+        0,
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "Remove the Grace status filter" }));
+    await waitFor(() =>
+      expect(apiMock.candidates).toHaveBeenCalledWith(
+        "condemn",
+        expect.objectContaining({ requested: "yes", grace_status: "any" }),
+        100,
+        0,
+      ),
+    );
+  });
+
+  it("bulk spare uses every matching season across pages without the whole-show key", async () => {
+    const first = season(1, "condemn");
+    const unseen = season(2, "condemn");
+    const waiting = season(3, "condemn");
+    apiMock.candidates.mockResolvedValue({
+      ...page(
+        [first],
+        [
+          rollup(
+            [first, unseen, waiting].map((s) => ({ ...s, season: s.season_number })),
+            {
+              matching_keys: [first.media_key, unseen.media_key],
+              condemned_count: 3,
+            },
+          ),
+        ],
+        2,
+      ),
+      grace_enforced: true,
+    });
+    window.localStorage.setItem(
+      filtersKey("condemn"),
+      JSON.stringify({ ...DEFAULT_FILTERS, grace: "complete" }),
+    );
+    const user = userEvent.setup();
+    renderQueue();
+    await screen.findByText("Example Show");
+    await user.click(screen.getByRole("button", { name: "Select" }));
+    await user.click(screen.getByRole("button", { name: "Select all" }));
+    await user.click(screen.getByRole("button", { name: "Spare" }));
+    await waitFor(() => expect(apiMock.override).toHaveBeenCalledTimes(2));
+    expect(apiMock.override).toHaveBeenCalledWith(first.media_key, "spare", undefined, 0);
+    expect(apiMock.override).toHaveBeenCalledWith(unseen.media_key, "spare", undefined, 0);
+  });
+});
+
+describe("grace filter scope and mode", () => {
+  afterEach(() => forgetFilters());
+  it("keeps the notice filter available when the filtered result is empty", async () => {
+    apiMock.candidates.mockResolvedValue({ ...page([]), grace_enforced: false });
+    const user = userEvent.setup();
+    renderQueue();
+    await user.click(await screen.findByRole("button", { name: "Filter" }));
+    expect(await screen.findByRole("button", { name: "Notice status" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Grace status" })).not.toBeInTheDocument();
+  });
+  it.each(["Spare", "Reap now"])(
+    "refuses %s when matching season keys are unavailable",
+    async (action) => {
+      apiMock.candidates.mockResolvedValue(page([season(1, "condemn")], [rollup([])]));
+      window.localStorage.setItem(
+        filtersKey("condemn"),
+        JSON.stringify({ ...DEFAULT_FILTERS, grace: "complete" }),
+      );
+      renderQueue();
+      const user = await selectAllDrawn();
+      await user.click(screen.getByRole("button", { name: new RegExp(`^${action}`) }));
+      await screen.findByText(/Couldn.t read the matching seasons/);
+      expect(apiMock.override).not.toHaveBeenCalled();
+      expect(apiMock.createRun).not.toHaveBeenCalled();
+    },
+  );
 });

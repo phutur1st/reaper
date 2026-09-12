@@ -373,6 +373,13 @@ class GroupRollupOut(BaseModel):
     """
 
     group_key: str
+    matching_keys: list[str] | None = Field(
+        default=None,
+        description=(
+            "All season keys matching this show before pagination. "
+            "Null without a grace filter. Bulk actions use these keys, not the show key."
+        ),
+    )
     condemned_count: int
     """How many seasons "Reap now" on this show would actually plan: its actable seasons,
     condemned minus hand-spares, plus hand reaps the engine honors. The count the planner's
@@ -397,6 +404,13 @@ class CandidatePageOut(BaseModel):
     describe their shape.
     """
 
+    grace_enforced: bool | None = Field(
+        default=None,
+        description=(
+            "True enforces grace; false is notice only; "
+            "null means unavailable settings or no snapshot."
+        ),
+    )
     items: list[CandidateOut]
     groups: list[GroupRollupOut]
     """One entry per show with a row on this page. A show whose seasons straddle two pages

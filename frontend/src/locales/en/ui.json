@@ -3301,6 +3301,17 @@
       "summary": "{n, plural, one {# season notice pending} other {# season notices pending}}, {complete} complete"
     },
     "markedOfTotal": "{n} of {total} marked for removal, {size}",
-    "queueIncludesWaiting": "Includes titles waiting for grace."
+    "queueIncludesWaiting": "Grace and safety checks still apply.",
+    "filter": {
+      "label": "Grace status",
+      "notice": "Notice status",
+      "waiting": "Waiting",
+      "complete": "Complete",
+      "unavailable": "Unavailable",
+      "matches": "{n} of {total} seasons match",
+      "graceChip": "Grace: {status}",
+      "noticeChip": "Notice: {status}",
+      "scopeUnavailable": "Couldn't read the matching seasons. Refresh and try again."
+    }
   }
 }

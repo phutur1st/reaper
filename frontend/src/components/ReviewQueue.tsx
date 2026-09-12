@@ -34,6 +34,7 @@ import {
   type Candidate,
   type CandidatePage,
   type Chip,
+  type GraceFilter,
   type GroupRollup,
   type GroupSeasonMark,
   type Override,
@@ -83,6 +84,7 @@ import {
 import {
   DEFAULT_FILTERS,
   filtersToQuery,
+  graceFilters,
   initialFilters,
   loadFilters,
   mediaFilters,
@@ -859,12 +861,13 @@ function seasonDivergence(
   };
 }
 
-/** The expanded show: EVERY season in the latest snapshot, whatever its lane, so kept
+/** The expanded show: every season, or the matching seasons under a grace filter, so kept
  *  and condemned read side by side. Every row is actable from here, not just the ones on
  *  the tab you opened: each carries its own Spare/Reap, judged by that season's OWN verdict,
  *  so an under-scored season inside a condemned show can be decided in place instead of only
  *  from Limbo. Clicking any row still opens its full reasoning. */
 function SeasonList({
+  matchingKeys,
   groupKey,
   selectedId,
   onOpen,
@@ -873,6 +876,7 @@ function SeasonList({
   pending,
   busyKey,
 }: {
+  matchingKeys?: string[] | null;
   groupKey: string;
   selectedId: number | null;
   onOpen: (id: number) => void;
@@ -918,7 +922,11 @@ function SeasonList({
   // (any non-condemned season). A show that is condemned top to bottom shows Spare alone on
   // every row and leaves no empty Reap slot, so the size sits flush without a gap. Every
   // row in one list uses the same width, so Spare and Reap line up straight down it.
-  const anyReapable = data.seasons.some((s) => !reapIsNoop(s));
+  const seasons =
+    matchingKeys == null
+      ? data.seasons
+      : data.seasons.filter((s) => matchingKeys.includes(s.media_key));
+  const anyReapable = seasons.some((s) => !reapIsNoop(s));
   // A whole-show decision covers every season here. When set, the header states it once and each
   // row only speaks up if it diverges (seasonDivergence); when null, every row wears its own scan
   // or hand chip as before. `show_override` is a property of the show, so all seasons share it.
@@ -954,7 +962,7 @@ function SeasonList({
           } as CSSProperties
         }
       >
-        {data.seasons.map((season) => {
+        {seasons.map((season) => {
           const divergence = showOverride ? seasonDivergence(season, showOverride) : null;
           const reason = divergence?.reason ?? null;
           // With a whole-show decision the header explains the inherited fate, so a row's chip is
@@ -1404,6 +1412,14 @@ const ShowCard = memo(function ShowCard({
             <ShowStatusChip status={showStatus} quiet />
             <RequestedChip who={group.requestedBy} />
             <GraceSummary seasons={showSeasons} />
+            {group.rollup?.matching_keys != null && (
+              <span>
+                {t("reviewGrace.filter.matches", {
+                  n: group.rollup.matching_keys.length,
+                  total: totalSeasons,
+                })}
+              </span>
+            )}
           </div>
           {marks && marks.length > 1 && <SeasonStrip marks={marks} onOpen={onOpen} />}
           <CardStatusLine
@@ -1447,6 +1463,7 @@ const ShowCard = memo(function ShowCard({
       {!selectMode && open && (
         <SeasonList
           groupKey={group.key}
+          matchingKeys={group.rollup?.matching_keys ?? null}
           selectedId={selectedId}
           onOpen={onOpen}
           onSet={onSet}
@@ -1753,6 +1770,7 @@ export function ReviewQueue({
   // fates on one page instead of the tab's single lane. The lane the operator left is untouched
   // underneath: `verdict` itself never changes for this, only which value the query sends.
   const queryVerdict: Verdict | "any" = activeCollection ? "any" : verdict;
+  const graceFiltered = queryVerdict === "condemn" && filters.grace !== "any";
   const {
     data: pages,
     isPending,
@@ -1767,6 +1785,7 @@ export function ReviewQueue({
         queryVerdict,
         {
           search,
+          grace_status: queryVerdict === "condemn" ? filters.grace : "any",
           media_type: filters.mediaType,
           requested: filters.requested,
           genre: filters.genre,
@@ -1779,6 +1798,7 @@ export function ReviewQueue({
         FETCH_PAGE,
         pageParam,
       ),
+    refetchInterval: graceFiltered && selected.size === 0 ? 30_000 : false,
     initialPageParam: 0,
     // The next offset, until we have fetched the whole filtered set the header counted.
     getNextPageParam: (last) => {
@@ -1801,7 +1821,9 @@ export function ReviewQueue({
   // header render a bare sum instead of saying what every other total says it could not
   // include.
   const totalSize = pages?.pages[0]?.total_bytes ?? 0;
-  const queueGraceEnforced = data?.some((item) => item.grace_enforced === true) ?? false;
+  const graceMode = pages?.pages[0]?.grace_enforced;
+  const queueGraceEnforced =
+    graceMode ?? data?.some((item) => item.grace_enforced === true) ?? false;
   const totalUnknownSize = pages?.pages[0]?.unknown_size ?? 0;
 
   // Reveal another render-page as the sentinel scrolls into view.
@@ -1820,6 +1842,18 @@ export function ReviewQueue({
   // The same overrides the why-panel sets, refreshing the same caches: one hook owns
   // the list of surfaces an override changes.
   const { setOverride, clearOverride, refresh } = useOverrideMutations();
+  const scopedKeys = (key: string): string[] => {
+    if (!graceFiltered) return [key];
+    const rollup = rollups.get(key);
+    if (rollup) {
+      if (!rollup.matching_keys?.length) throw new Error(t("reviewGrace.filter.scopeUnavailable"));
+      return rollup.matching_keys;
+    }
+    if (!data?.some((item) => item.media_key === key && !item.group_key)) {
+      throw new Error(t("reviewGrace.filter.scopeUnavailable"));
+    }
+    return [key];
+  };
   const bulk = useMutation({
     // allSettled, not Promise.all: Promise.all rejects on the first failed request and skips
     // onSuccess entirely, so a single 500 among fifty would leave ~49 already-applied changes
@@ -1841,12 +1875,19 @@ export function ReviewQueue({
        *  without this a show whose marks are all season-level cleared nothing. */
       showKeys?: Set<string>;
     }) => {
+      const scopes = keys.map((key) => scopedKeys(key));
       const results = await Promise.allSettled(
-        keys.map((key) =>
-          decision === null
-            ? api.clearOverride(key, showKeys?.has(key) ?? false)
-            : api.override(key, decision, undefined, spareDays),
-        ),
+        scopes.map(async (scope) => {
+          const writes = await Promise.allSettled(
+            scope.map((key) =>
+              decision === null
+                ? api.clearOverride(key, !graceFiltered && (showKeys?.has(key) ?? false))
+                : api.override(key, decision, undefined, spareDays),
+            ),
+          );
+          if (writes.some((result) => result.status === "rejected"))
+            throw new Error("Some decisions failed.");
+        }),
       );
       return keys.filter((_, i) => results[i]!.status === "rejected");
     },
@@ -1904,7 +1945,7 @@ export function ReviewQueue({
     // above is a convenience, not the control.
     mutationFn: async (keys: string[]) => {
       if (keys.length === 0) throw new Error(t("reviewQueue.nothingSelectedError"));
-      const run = await api.createRun(keys);
+      const run = await api.createRun([...new Set(keys.flatMap(scopedKeys))]);
       const report = await api.dryRun(run.id);
       return { run, report };
     },
@@ -2223,8 +2264,24 @@ export function ReviewQueue({
         value: (f) => f.override,
         set: (f, v) => ({ ...f, override: v as OverrideFilter }),
       },
+      ...(queryVerdict === "condemn"
+        ? [
+            {
+              id: "grace",
+              label:
+                graceMode === false
+                  ? t("reviewGrace.filter.notice")
+                  : t("reviewGrace.filter.label"),
+              icon: <FunnelIcon />,
+              defaultValue: "any",
+              options: graceFilters(),
+              value: (f: QueueFilters) => f.grace,
+              set: (f: QueueFilters, v: string) => ({ ...f, grace: v as GraceFilter }),
+            },
+          ]
+        : []),
     ],
-    [genreOptions, libraryOptions, t],
+    [genreOptions, libraryOptions, t, graceMode, queryVerdict],
   );
 
   const activeDimensions = dimensions.filter((d) => d.value(filters) !== d.defaultValue);
@@ -2346,7 +2403,15 @@ export function ReviewQueue({
   if (verdict === "condemn" && selected.size > 0) {
     const perKey = new Map(
       groups.map(
-        (g) => [groupKeyOf(g), g.isShow ? g.rollup?.condemned_count : g.items.length] as const,
+        (g) =>
+          [
+            groupKeyOf(g),
+            g.isShow
+              ? graceFiltered
+                ? g.rollup?.matching_keys?.length
+                : g.rollup?.condemned_count
+              : g.items.length,
+          ] as const,
       ),
     );
     let total = 0;
@@ -2754,7 +2819,13 @@ export function ReviewQueue({
                       <span className="fchip-ic" aria-hidden="true">
                         {d.icon}
                       </span>
-                      <b>{label}</b>
+                      <b>
+                        {d.id === "grace"
+                          ? graceMode === false
+                            ? t("reviewGrace.filter.noticeChip", { status: label })
+                            : t("reviewGrace.filter.graceChip", { status: label })
+                          : label}
+                      </b>
                       <CaretIcon />
                     </button>
                     <button
@@ -3080,6 +3151,7 @@ export function ReviewQueue({
         {selectEverything.isError && (
           <p className="error bulk-error">{t("reviewQueue.selectEverythingError")}</p>
         )}
+        {bulk.error && <p className="error bulk-error">{describeError(bulk.error)}</p>}
         {bulkFailures > 0 && (
           <p className="error bulk-error">
             {t("reviewQueue.bulkFailuresMessage", { n: bulkFailures })}
