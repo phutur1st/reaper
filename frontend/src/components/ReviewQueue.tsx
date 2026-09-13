@@ -1806,7 +1806,6 @@ export function ReviewQueue({
         FETCH_PAGE,
         pageParam,
       ),
-    refetchInterval: graceFiltered && selected.size === 0 ? 30_000 : false,
     initialPageParam: 0,
     // The next offset, until we have fetched the whole filtered set the header counted.
     getNextPageParam: (last) => {
@@ -2038,6 +2037,15 @@ export function ReviewQueue({
       pending,
     [selectedId, selectedGroupKey, selected, pending],
   );
+  // Countdown expiry uses the same busy check as a new scan. Do not start a
+  // refresh while an explanation or a selection is being reviewed.
+  useEffect(() => {
+    if (!graceFiltered) return;
+    const timer = window.setInterval(() => {
+      if (!isBusy()) void refreshReview();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [graceFiltered, isBusy, refreshReview]);
   // A quiet refresh still says so. When a newer scan lands while the reviewer is idle at the
   // top, the list swaps under them, and a brief toast confirms it moved to the newest scan, so
   // the numbers never change with no acknowledgment. It is the silent path's only signal; the
