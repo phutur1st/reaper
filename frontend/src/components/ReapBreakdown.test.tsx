@@ -4,13 +4,13 @@
 // total. The summary card beside this one (ReapPlan.tsx) owns every other state (loading, a
 // failed read, no scan yet, and nothing to reap), so this card renders nothing at all in
 // those states rather than saying the same thing twice.
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReapBreakdown as Breakdown, ScanStatus } from "../api";
 import { expectNoA11yViolations } from "../test/a11y";
 import { renderWithProviders } from "../test/renderWithProviders";
-import { ReapBreakdown } from "./ReapBreakdown";
+import { ReapBreakdown, useReapCounts } from "./ReapBreakdown";
 
 const { apiMock } = await vi.hoisted(async () => ({
   apiMock: (await import("../test/apiMock")).makeApiMock(),
@@ -391,4 +391,41 @@ it("shows waiting titles even when grace leaves nothing ready to plan", async ()
   await user.click(screen.getByText("Earliest deletion dates"));
   expect(screen.getByText(/Example one/)).toBeVisible();
   expect(screen.getByText(/Countdown missing. Kept until a scan starts it/)).toBeVisible();
+});
+
+it("refreshes the shared reap count after grace expires, then stops polling", async () => {
+  function Count() {
+    const counts = useReapCounts();
+    return <output>{counts.reapCount}</output>;
+  }
+  apiMock.reapBreakdown.mockResolvedValue(
+    full({
+      grace_enforced: true,
+      will_reap: 0,
+      grace_waiting: [{ candidate_id: 1, title: "Example", grace_ends_at: "2026-09-01T00:00:01Z" }],
+    }),
+  );
+  vi.useFakeTimers();
+  const view = renderWithProviders(<Count />);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(screen.getByRole("status")).toHaveTextContent("0");
+  apiMock.reapBreakdown.mockResolvedValue(
+    full({ grace_enforced: true, will_reap: 1, grace_waiting: [] }),
+  );
+  try {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("1");
+    expect(apiMock.reapBreakdown).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(apiMock.reapBreakdown).toHaveBeenCalledTimes(2);
+  } finally {
+    view.unmount();
+    vi.useRealTimers();
+  }
 });
