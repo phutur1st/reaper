@@ -33,7 +33,7 @@ from types import MappingProxyType
 from typing import Any
 
 import structlog
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import bindparam, delete, select, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
@@ -1238,6 +1238,7 @@ async def scan(
 
     # Both lanes append here, and every count of the condemned set is this list's length.
     condemned_keys: list[str] = []
+    kept_keys: list[str] = []
     # Which rung of the size ladder actually fired, counted across the whole scan. This is
     # the only place that tracks how often a size goes unreported. Counts only, never a
     # title or a path.
@@ -1435,6 +1436,8 @@ async def scan(
         )
         if verdict == "condemn":
             condemned_keys.append(item.media_key)
+        else:
+            kept_keys.append(item.media_key)
 
     # What each show's season plan was decided from, frozen once per show. Every season of
     # a show carries the same bundle object, so this dedupes to one row per show. Without
@@ -1558,6 +1561,8 @@ async def scan(
         )
         if verdict == "condemn":
             condemned_keys.append(judgment.media_key)
+        else:
+            kept_keys.append(judgment.media_key)
 
     # A library-wide identity event, which is the Plex-side twin of the Tautulli regression
     # check. Both lanes have bound by here, so this is the first point the share can be
@@ -1602,6 +1607,15 @@ async def scan(
             reason="degraded",
         )
     else:
+        # Clear only clocks for items this healthy scan judged off the list. Missing
+        # items are not evidence of a departure. record_first_flagged_bulk then gives
+        # a returning item a fresh window, even after a single healthy keep verdict.
+        for start in range(0, len(kept_keys), KEY_CHUNK):
+            await session.execute(
+                delete(FirstFlagged).where(
+                    FirstFlagged.media_key.in_(kept_keys[start : start + KEY_CHUNK])
+                )
+            )
         await record_first_flagged_bulk(session, condemned_keys, now, grace_days=grace_days)
 
     await session.flush()
@@ -2263,27 +2277,14 @@ def _apply_first_flag(
     *,
     grace_days: int,
 ) -> FirstFlagged | None:
-    """Sets the grace clock once, and never moves it while the item stays condemned, but
-    restarts it when an item that had left the condemned set comes back.
+    """Preserve a running clock, or restart after a gap longer than grace.
 
-    A transient Sonarr timeout that drops an item from one snapshot must not reset the
-    clock, or the item could never age out and the grace period would become
-    unreachable. That is why ``first_flagged_at`` is not touched on an ordinary
-    re-condemn.
+    Healthy departures are cleared by ``scan``; override departures are cleared by
+    ``api.whitelist._sync_grace_clocks``. A missing row therefore earns a fresh window.
+    The gap check also restarts legacy clocks and long absences without a known departure.
+    A short outage retains the original clock.
 
-    The other direction matters just as much: an item condemned long ago, then rescued
-    (watched, spared, or re-judged as protect), and later condemned again a full dormancy
-    period afterward, must serve a fresh grace window. Its old ``first_flagged_at`` is far
-    in the past, so grace_report would drop it straight into ``ready`` with no countdown
-    and no Leaving Soon warning. With grace enforcement enabled, that would also skip
-    the deletion hold (``grace.deletion_eligibility``). Reaper detects the return by the gap
-    since the item was last seen condemned. When that gap exceeds the grace window, so it
-    genuinely left rather than just missing a snapshot to an outage, the clock restarts.
-    ``last_seen_condemned_at`` exists for exactly this reset.
-
-    This is the decision, applied per key by :func:`record_first_flagged_bulk`, the only
-    write path to the grace clock. A key with no row yet is returned as a new row rather
-    than inserted here, so the recorder can insert it conflict-tolerantly.
+    ``record_first_flagged_bulk`` inserts returned rows conflict-tolerantly.
     """
     if existing is None:
         return FirstFlagged(media_key=media_key, first_flagged_at=now, last_seen_condemned_at=now)
