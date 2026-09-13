@@ -2604,4 +2604,47 @@ describe("grace refresh safety", () => {
       view.unmount();
     },
   );
+
+  it.each([false, true])(
+    "filtered clear retains only scopes that removed nothing: %s",
+    async (removed) => {
+      const inherited = season(1, "condemn", {
+        override: "reap",
+        override_own: null,
+        show_override: "reap",
+      });
+      apiMock.candidates.mockResolvedValue({
+        ...page(
+          [inherited],
+          [
+            rollup([{ ...inherited, season: 1 }], {
+              matching_keys: [inherited.media_key, "sonarr:1:2"],
+              condemned_count: 2,
+            }),
+          ],
+        ),
+        grace_enforced: true,
+      });
+      apiMock.clearOverride
+        .mockResolvedValue({ removed: false })
+        .mockResolvedValueOnce({ removed });
+      window.localStorage.setItem(
+        filtersKey("condemn"),
+        JSON.stringify({ ...DEFAULT_FILTERS, grace: "complete" }),
+      );
+      renderQueue();
+      const user = await selectAllDrawn();
+      const clear = screen.getByRole("button", { name: "Clear override" });
+      expect(clear).toHaveAttribute(
+        "title",
+        "Clear matching movie and season decisions. Whole-show decisions stay.",
+      );
+      await user.click(clear);
+      await waitFor(() =>
+        expect(apiMock.clearOverride).toHaveBeenCalledWith(inherited.media_key, false),
+      );
+      await waitFor(() => expect(pickedCount()).toMatch(removed ? /Tap or drag/ : /1/));
+      expect(apiMock.clearOverride).toHaveBeenCalledTimes(2);
+    },
+  );
 });

@@ -1892,7 +1892,14 @@ export function ReviewQueue({
                 : api.override(key, decision, undefined, spareDays),
             ),
           );
-          if (writes.some((result) => result.status === "rejected"))
+          const noneRemoved =
+            decision === null &&
+            graceFiltered &&
+            writes.every(
+              (result) =>
+                result.status === "fulfilled" && "removed" in result.value && !result.value.removed,
+            );
+          if (noneRemoved || writes.some((result) => result.status === "rejected"))
             throw new Error("Some decisions failed.");
         }),
       );
@@ -3136,7 +3143,11 @@ export function ReviewQueue({
                     showKeys: new Set(groups.filter((g) => g.isShow).map((g) => g.key)),
                   })
                 }
-                title={t("reviewQueue.clearOverrideTitle")}
+                title={
+                  graceFiltered
+                    ? t("reviewGrace.filter.clearTitle")
+                    : t("reviewQueue.clearOverrideTitle")
+                }
               >
                 {t("reviewQueue.clearOverrideButton")}
               </button>

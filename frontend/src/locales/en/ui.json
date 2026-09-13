@@ -3362,7 +3362,8 @@
       "matches": "{n} of {total} seasons match",
       "graceChip": "Grace: {status}",
       "noticeChip": "Notice: {status}",
-      "scopeUnavailable": "Couldn't read the matching seasons. Refresh and try again."
+      "scopeUnavailable": "Couldn't read the matching seasons. Refresh and try again.",
+      "clearTitle": "Clear matching movie and season decisions. Whole-show decisions stay."
     }
   }
 }
