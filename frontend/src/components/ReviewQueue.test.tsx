@@ -2554,3 +2554,54 @@ describe("grace filter scope and mode", () => {
     },
   );
 });
+
+describe("grace refresh safety", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    forgetFilters();
+  });
+
+  it.each(["panel", "scroll", "idle"])(
+    "respects review activity while polling: %s",
+    async (state) => {
+      window.localStorage.setItem(
+        filtersKey("condemn"),
+        JSON.stringify({ ...DEFAULT_FILTERS, grace: "complete" }),
+      );
+      apiMock.candidates.mockResolvedValue({ ...page([movie(1)]), grace_enforced: true });
+      vi.useFakeTimers();
+      const view = renderWithProviders(
+        <ReviewQueue
+          verdict="condemn"
+          onVerdictChange={() => {}}
+          selectedId={state === "panel" ? 1 : null}
+          selectedGroupKey={null}
+          onSelect={() => {}}
+          onSelectGroup={() => {}}
+          latestScanSnapshotId={1}
+        />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect(screen.getByText("Example Movie 1")).toBeInTheDocument();
+      if (state === "scroll") vi.stubGlobal("scrollY", 200);
+      const reads = apiMock.candidates.mock.calls.length;
+      apiMock.candidates.mockResolvedValue({
+        ...page([movie(2)], [], 1, 0, 2),
+        grace_enforced: true,
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      if (state === "idle") {
+        expect(apiMock.candidates.mock.calls.length).toBeGreaterThan(reads);
+        expect(screen.getByText("Example Movie 2")).toBeInTheDocument();
+      } else {
+        expect(apiMock.candidates).toHaveBeenCalledTimes(reads);
+        expect(screen.getByText("Example Movie 1")).toBeInTheDocument();
+      }
+      view.unmount();
+    },
+  );
+});
