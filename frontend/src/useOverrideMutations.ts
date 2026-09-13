@@ -61,8 +61,7 @@ export function useOverrideMutations() {
   // That keeps the show in the lane the operator is looking at (a whole-show reap of an item
   // sitting in Limbo would otherwise re-bucket to Condemned and vanish mid-review), the same
   // "don't live-disappear" behavior a per-item decision already gets. The per-season strip
-  // marks (the page's `groups` rollup) and the honored-vs-held flag settle on the next fetch,
-  // the same as a per-item season decision's do. Only the show-level fields are touched: a
+  // marks (the page's `groups` rollup) settle through refreshGrace after the write. Only the show-level fields are touched: a
   // whole-show decision sets no season's own override, and the effective (inherited)
   // resolution stays the server's, never recomputed on the client.
   //
@@ -93,6 +92,83 @@ export function useOverrideMutations() {
     return matched;
   };
 
+  // Keep rows in their current lane, but replace their live clock from the server.
+  // A group read also covers strip marks whose seasons are not on the loaded page.
+  const refreshGrace = async (key: string) => {
+    const cached = queryClient.getQueriesData<InfiniteData<CandidatePage>>({
+      queryKey: ["candidates"],
+    });
+    const rows = cached.flatMap(
+      ([, data]) =>
+        data?.pages.flatMap((page) =>
+          page.items.filter((c) => c.media_key === key || c.group_key === key),
+        ) ?? [],
+    );
+    const ids = new Set(rows.map((c) => c.id));
+    const groupKeys = new Set(rows.flatMap((c) => (c.group_key ? [c.group_key] : [])));
+    const patch = (fresh: Map<number, Candidate>) => {
+      queryClient.setQueriesData<InfiniteData<CandidatePage>>(
+        { queryKey: ["candidates"] },
+        (old) =>
+          old
+            ? {
+                ...old,
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((c) => {
+                    if (!ids.has(c.id) && !groupKeys.has(c.group_key ?? "")) return c;
+                    const row = fresh.get(c.id);
+                    return {
+                      ...c,
+                      grace_enforced: row?.grace_enforced ?? null,
+                      grace_ends_at: row?.grace_ends_at ?? null,
+                      first_flagged_at: row?.first_flagged_at ?? null,
+                    };
+                  }),
+                  groups: page.groups.map((group) =>
+                    !groupKeys.has(group.group_key)
+                      ? group
+                      : {
+                          ...group,
+                          seasons: group.seasons.map((season) => {
+                            const row = fresh.get(season.id);
+                            return {
+                              ...season,
+                              ...(row
+                                ? {
+                                    override: row.override,
+                                    override_effective: row.override_effective,
+                                    spare_expires_at: row.spare_expires_at,
+                                    spare_covers_until: row.spare_covers_until,
+                                  }
+                                : {}),
+                              grace_enforced: row?.grace_enforced ?? null,
+                              grace_ends_at: row?.grace_ends_at ?? null,
+                            };
+                          }),
+                        },
+                  ),
+                })),
+              }
+            : old,
+      );
+    };
+    patch(new Map());
+    const results = await Promise.allSettled([
+      ...[...groupKeys].map(async (group) => (await api.group(group)).seasons),
+      ...[...new Map(rows.filter((c) => !c.group_key).map((c) => [c.id, c])).values()].map(
+        async (c) => [await api.candidate(c.id)],
+      ),
+    ]);
+    patch(
+      new Map(
+        results.flatMap((result) =>
+          result.status === "fulfilled" ? result.value.map((c) => [c.id, c] as const) : [],
+        ),
+      ),
+    );
+  };
+
   // After a single hand decision, refreshes the show panels, the why-panel and the Reap
   // ledger now. When the decided row was patched in place (a movie or season by media_key, or
   // a whole show by its loaded seasons' group key), it marks the queue stale without
@@ -101,12 +177,13 @@ export function useOverrideMutations() {
   // currently loaded), it refetches the active tab instead, since there is no on-screen
   // overlay to preserve. A bulk action re-buckets at once on purpose and uses `refresh` below,
   // not this path.
-  const settle = (patchedInPlace: boolean) => {
+  const settle = async (key: string, patchedInPlace: boolean) => {
     void queryClient.invalidateQueries({
       queryKey: ["candidates"],
       refetchType: patchedInPlace ? "none" : "active",
     });
     for (const queryKey of OVERRIDE_AWARE) void queryClient.invalidateQueries({ queryKey });
+    if (patchedInPlace) await refreshGrace(key);
   };
 
   // A full refetch, including the active queue tab. Bulk actions apply a decision to a whole
@@ -157,7 +234,7 @@ export function useOverrideMutations() {
           // understates how long the file is kept, the cautious side of a keep claim.
           spare_covers_until: spareExpiresAt,
         }) || patchShowOverride(key, decision, spareExpiresAt);
-      settle(patched);
+      return settle(key, patched);
     },
   });
   const clearOverride = useMutation({
@@ -176,7 +253,7 @@ export function useOverrideMutations() {
           // reads it before the refetch resolves what (if anything) still covers the row.
           spare_covers_until: null,
         }) || patchShowOverride(key, null, null);
-      settle(patched);
+      return settle(key, patched);
     },
   });
 
