@@ -3789,3 +3789,109 @@ class TestTheScanRecordsTheListsItGatheredUnder:
 
         assert expected is not None, "the seeded registry has to be readable for this to mean it"
         assert captured.get("list_config_hash") == expected
+
+
+@pytest.mark.parametrize("departure", ["protect", "abstain", "degraded", "missing"])
+async def test_grace_reentry_after_a_short_scan_gap(
+    session: AsyncSession,
+    cache_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    departure: str,
+) -> None:
+    """A confirmed departure resets both lanes; missing or degraded evidence does not."""
+    from reaper.engine.policy import ProfileSettings
+    from reaper.services.grace import deletion_eligibility
+
+    now = datetime(2026, 8, 1, tzinfo=UTC)
+    monkeypatch.setattr(snapshot_service, "utcnow", lambda: now)
+    await _seed_play(cache_engine, row_id=1, rating_key=99)
+    await _seed_imdb(cache_engine, {"tt0000001": (5.0, 5000), "tt0000042": (5.0, 5000)})
+
+    async def take_scan(*, leaving: bool = False) -> Snapshot:
+        movie_policy = DEFAULT_MOVIE_POLICY
+        tv_policy = DEFAULT_TV_POLICY
+        if leaving and departure == "abstain":
+            movie_policy = movie_policy.model_copy(update={"condemn_at": 100})
+            tv_policy = tv_policy.model_copy(update={"condemn_at": 100})
+        radarrs = [
+            RadarrSource(client=FakeRadarr(movie_rows=_movie_payloads()), instance_id=1, name="hd")
+        ]
+        sonarrs = [
+            season_scan.SonarrSource(
+                client=_GriddedSonarr(series_rows=_series_payloads()), instance_id=1, name="tv"
+            )
+        ]
+        if leaving and departure == "degraded":
+            radarrs.append(
+                RadarrSource(client=FakeRadarr(fail_movies=True), instance_id=2, name="other")
+            )
+        if leaving and departure == "missing":
+            radarrs = []
+            sonarrs = []
+        return await scan(
+            cache_engine,
+            session,
+            radarrs=radarrs,
+            sonarrs=sonarrs,
+            tautulli=scan_library(
+                movies=_movie_spine(), shows=_show_spine(), children=_show_children()
+            ),
+            movie_policy=movie_policy,
+            movie_gates=build_gates(movie_policy),
+            tv_policy=tv_policy,
+            tv_gates=build_gates(tv_policy),
+        )
+
+    first = await take_scan()
+    assert not first.degraded
+    keys = ["radarr:1:1", "sonarr:1:42:2"]
+    for key in keys:
+        clock = await session.get(FirstFlagged, key)
+        assert clock is not None
+        clock.first_flagged_at = now - timedelta(days=30)
+        clock.last_seen_condemned_at = now - timedelta(days=1)
+    await session.flush()
+    if departure == "protect":
+        await lists.sync(
+            cache_engine,
+            _StaticList(
+                [
+                    lists.ListItem(media_type="movie", imdb_id="tt0000001", title="A"),
+                    lists.ListItem(media_type="tv", imdb_id="tt0000042", title="B"),
+                ]
+            ),
+            mode=lists.ListMode.HARD,
+            kind=lists.ListKind.WHITELIST,
+        )
+    left = await take_scan(leaving=True)
+    assert left.degraded is (departure == "degraded")
+    if departure in {"protect", "abstain"}:
+        rows = {c.media_key: c for c in await candidates(session, left.id)}
+        for key in keys:
+            assert rows[key].verdict == departure
+            assert await session.get(FirstFlagged, key) is None
+    else:
+        for key in keys:
+            clock = await session.get(FirstFlagged, key)
+            assert clock is not None
+            assert clock.first_flagged_at == now - timedelta(days=30)
+    if departure == "protect":
+        await lists.sync(
+            cache_engine, _StaticList([]), mode=lists.ListMode.HARD, kind=lists.ListKind.WHITELIST
+        )
+    now += timedelta(days=1)
+    returned = await take_scan()
+    assert not returned.degraded
+    rows = {c.media_key: c for c in await candidates(session, returned.id) if c.media_key in keys}
+    assert all(c.verdict == "condemn" for c in rows.values())
+    result = await deletion_eligibility(
+        session, rows, ProfileSettings(enforce_grace_period=True), now=now
+    )
+    if departure in {"protect", "abstain"}:
+        assert set(result.waiting) == set(keys)
+        assert result.eligible == {}
+        for key in keys:
+            clock = await session.get(FirstFlagged, key)
+            assert clock is not None and clock.first_flagged_at == now
+    else:
+        assert set(result.eligible) == set(keys)

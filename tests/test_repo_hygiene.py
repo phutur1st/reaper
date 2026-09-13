@@ -6582,6 +6582,7 @@ _MEMBERSHIP_INVENTORY: dict[str, tuple[int, str]] = {
         "bounded: the fixed TERMINAL_DELETE_KINDS set",
     ),
     "src/reaper/services/season_scan.py::season_watch_stats": (3, "chunked"),
+    "src/reaper/services/snapshot.py::scan": (1, "chunked"),
     "src/reaper/services/snapshot.py::record_first_flagged_bulk": (1, "chunked"),
     "src/reaper/services/snapshot.py::_fold_merged_watch_stats": (1, "chunked"),
 }

@@ -474,8 +474,9 @@ refused: it erases the protection during an *arr outage, the exact failure the g
 
 When enabled, `deletion_eligibility` holds items until `first_flagged_at + grace_days`,
 including hand reaps and seasons. Missing clocks hold items. Bulk plans omit waiting items;
-explicit selections containing one are refused. Enabling grace preserves existing start dates
-and the scan's re-entry reset rules. Elapsed time does not prove a notice was delivered.
+explicit selections containing one are refused. Enabling grace preserves existing start dates.
+A healthy scan clears clocks for items it judges off the list, so re-entry starts fresh.
+Missing items and degraded scans leave clocks unchanged. Elapsed time does not prove delivery.
 
 Planning, run totals, confirmation and execution share this partition. The executor rechecks
 per item and retains the stricter grace from claim time: loosening settings cannot expand a
