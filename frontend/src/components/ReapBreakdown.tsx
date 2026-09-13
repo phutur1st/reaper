@@ -89,7 +89,11 @@ export function useReapCounts(): {
   movies: number;
   seasons: number;
 } {
-  const breakdown = useQuery({ queryKey: ["reap-breakdown"], queryFn: api.reapBreakdown });
+  const breakdown = useQuery({
+    queryKey: ["reap-breakdown"],
+    queryFn: api.reapBreakdown,
+    refetchInterval: (query) => (query.state.data?.grace_waiting.length ? 30_000 : false),
+  });
   const allowance = useHoldsBackUnmeasured();
   const data = breakdown.data;
   const holdsBackUnmeasured = allowance.holdsBack;
