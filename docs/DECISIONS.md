@@ -478,7 +478,9 @@ explicit selections containing one are refused. Enabling grace preserves existin
 A healthy scan clears clocks for items it judges off the list, so re-entry starts fresh.
 Missing items and degraded scans leave clocks unchanged. Elapsed time does not prove delivery.
 
-Planning, run totals, confirmation and execution share this partition. The executor rechecks
+Planning, run totals, confirmation and execution share this partition. The execute route
+freezes the keys its accepted phrase counted; the executor intersects live eligibility with
+that set, so a deadline passing before execution cannot add an unconfirmed item. It rechecks
 per item and retains the stricter grace from claim time: loosening settings cannot expand a
 running plan or release its holds. Grace is independent of caps and outside the policy hash.
 Approval and other deletion checks still apply; scheduled jobs never delete media.

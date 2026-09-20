@@ -989,6 +989,10 @@ async def execute_run(request: Request, run_id: int, payload: ExecuteRunIn) -> R
             )
             if payload.confirmation_phrase.strip() != expected:
                 refuse(409, "error.runs.confirmation_mismatch", expected=expected)
+            # Freeze what this phrase authorized before gateway setup or task scheduling
+            # can let another grace clock expire. Executor.execute intersects live
+            # eligibility with these keys; even an empty confirmation stays empty.
+            confirmed_media_keys = frozenset(c.media_key for c in planned)
             status.total = len(planned)
 
         # Builds the live clients now, in the request, so a misconfigured
@@ -1085,7 +1089,7 @@ async def execute_run(request: Request, run_id: int, payload: ExecuteRunIn) -> R
                 # This is the "a real reap began" line, so the log shows
                 # the start even if the process dies mid-run.
                 log.info("reap.started", run_id=run_id, planned=status.total)
-                report = await executor.execute(run_id)
+                report = await executor.execute(run_id, confirmed_media_keys=confirmed_media_keys)
                 await _retry_bins(app, gateway)
                 try:
                     # This is a second layer, not the durability itself.
