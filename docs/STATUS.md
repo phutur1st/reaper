@@ -52,7 +52,7 @@ Last verified against the code: 2026-08-02.
    None can be written: a grant must record a passed backtest, and M3c, the engine that would
    have judged it, is dropped. Building this means choosing a different bar and dropping that
    column with it (rule 148). The optional grace gate (`services/grace.py`) holds deletion
-   until the countdown ends; it does not grant unattended approval.
+   until the countdown ends; execution cannot expand beyond the confirmed items.
    Dropping the idea means deleting the table and this item, which is a valid way to close it.
 2. **Two leftovers in the stylesheet** (`docs/history/CSS_SPLIT_PLAN.md`). `.notice` still lives
    in the simulator section, and a dead-CSS pass has to stay manual, because 96 sites compute

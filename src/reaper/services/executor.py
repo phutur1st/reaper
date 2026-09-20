@@ -963,11 +963,9 @@ class Executor:
         # not per run, because a run takes minutes and a decision made in minute two must
         # still reach minute three.
         self._decisions: dict[str, str] = {}
-        # The effective condemned set as it stood when the run was claimed. Deliberately
-        # not refreshed: it is the ceiling on what this run may send, since the caps and
-        # the operator's typed confirmation both counted it, so the per-item checks
-        # intersect against it and can only ever remove items, never add one that was
-        # never authorized.
+        # The claim-time effective set, narrowed by execute() to the keys the API
+        # confirmed. Caps and per-item checks share this ceiling; later changes can
+        # remove items but cannot add any.
         self._effective_keys: set[str] = set()
         # What ``_revive`` re-reads. Set once the run is loaded; None before that, when
         # there is nothing loaded to revive.
@@ -984,7 +982,15 @@ class Executor:
         # ``_run_deletes``.
         self._file_is_gone = False
 
-    async def execute(self, run_id: int) -> RunReport:
+    async def execute(
+        self, run_id: int, *, confirmed_media_keys: frozenset[str] | None = None
+    ) -> RunReport:
+        """Execute within the caller's confirmed set, intersected with live eligibility.
+
+        The execute route passes the keys its accepted phrase counted. An explicit empty
+        set permits no deletions. Callers without a confirmation, such as dry runs,
+        omit the ceiling to evaluate current eligibility.
+        """
         run, steps = await _load(self._session, run_id)
         self._run_id = run_id
         self._snapshot_id = run.snapshot_id
@@ -1053,6 +1059,8 @@ class Executor:
             await deletion_eligibility(self._session, effective, self._grace_settings)
         ).eligible
         self._effective_keys = set(effective)
+        if confirmed_media_keys is not None:
+            self._effective_keys.intersection_update(confirmed_media_keys)
         self._pending_refreshes = {}
         self._affected_sections = set()
         self._section_pre_counts = {}
@@ -2005,11 +2013,10 @@ class Executor:
         # scan-condemned item that never had a hand reap at all, needs a different
         # explanation than a reap withdrawn mid-run.
         #
-        # ``_effective_keys`` is the set as it stood when the run was claimed, the
-        # ceiling, so a reap added mid-run cannot smuggle in an item outside what the
-        # operator confirmed, and an item spared before the claim stays out even if that
-        # spare is withdrawn while the run walks. Neither check here says anything about
-        # a hand reap.
+        # execute() intersects claim-time eligibility with the API's confirmed keys to
+        # set ``_effective_keys``. A grace expiry or reap added after confirmation cannot
+        # expand it, and a spare removed after the claim cannot restore an item to it.
+        # Neither check here says anything about a hand reap.
         if candidate.media_key not in self._effective_keys:
             return self._mark_skipped(
                 delete,

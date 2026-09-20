@@ -5,14 +5,20 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastapi import FastAPI
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from starlette.requests import Request
 
-from reaper.api.runs import _planned_candidates
-from reaper.db.models import ActionStep, Candidate, FirstFlagged, Profile
+from reaper.api.runs import _planned_candidates, execute_run
+from reaper.api.schemas import ExecuteRunIn
+from reaper.config import Settings
+from reaper.crypto import SecretBox
+from reaper.db.models import ActionStep, Candidate, FirstFlagged, Profile, RunState, StepState
 from reaper.engine.policy import ProfileSettings
 from reaper.services.breakdown import reap_breakdown
 from reaper.services.executor import Executor, StepOutcome, _Delete
@@ -20,7 +26,7 @@ from reaper.services.grace import deletion_eligibility, grace_report
 from reaper.services.planner import PlanError, build_plan
 from reaper.services.profiles import save_profile_settings
 
-from .test_reap_loop import GB, _read_only, _snapshot_with
+from .test_reap_loop import GB, FakeRadarr, _gateway, _read_only, _snapshot_many, _snapshot_with
 
 
 @pytest.fixture
@@ -302,3 +308,101 @@ async def test_claim_time_grace_survives_mid_run_disablement(
     assert report.would_delete_bytes == GB
     assert report.skipped == 1
     assert report.outcomes[1].detail.id == "error.reap.step.grace_waiting"
+
+
+@pytest.mark.parametrize("prefix", ["radarr:1", "sonarr:1:1"])
+async def test_confirmed_keys_only_narrow_live_eligibility_and_cap_counts(
+    session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    prefix: str,
+) -> None:
+    """A confirmed item can still be held, and an eligible unconfirmed item stays out.
+
+    The one-item cap also proves cap math sees the intersection on both media lanes.
+    """
+    monkeypatch.setattr("reaper.services.grace.utcnow", lambda: NOW)
+    keys = [f"{prefix}:{i}" for i in range(1, 4)]
+    snap = await _snapshot_with(session, [(key, GB) for key in keys])
+    run = await build_plan(session, snapshot_id=snap, approved_by="test")
+    for key in keys:
+        await _flag(session, key, timedelta(days=30))
+    settings = ProfileSettings(enforce_grace_period=True, grace_days=21, max_items_per_run=1)
+    await save_profile_settings(session, settings)
+    # The second item's clock restarts after confirmation. The third was never confirmed.
+    await session.execute(
+        update(FirstFlagged).where(FirstFlagged.media_key == keys[1]).values(first_flagged_at=NOW)
+    )
+    report = await Executor(session, safety=_read_only(), settings=settings).execute(
+        run.id, confirmed_media_keys=frozenset(keys[:2])
+    )
+    assert report.state == RunState.COMPLETED
+    assert report.would_delete_items == 1
+    assert report.would_delete_bytes == GB
+    assert report.skipped == 2
+    assert [outcome.media_key for outcome in report.outcomes if outcome.proven] == [keys[0]]
+    assert report.outcomes[1].detail.id == "error.reap.step.grace_waiting"
+    assert report.outcomes[2].detail.id == "error.reap.step.not_in_confirmed_run"
+
+
+@pytest.mark.parametrize("ready_index", [None, 0, 1])
+async def test_grace_expiring_after_confirmation_cannot_expand_the_real_run(
+    async_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    ready_index: int | None,
+) -> None:
+    """Cross the deadline in gateway setup, after the route accepts the phrase.
+
+    Both the route and executor are real; only external services are fakes. The empty
+    confirmation must stay empty too, and either planned item can be the confirmed one.
+    """
+    monkeypatch.setattr("reaper.services.grace.utcnow", lambda: NOW)
+    keys = ["radarr:1:1", "radarr:1:2"]
+    async with async_factory() as session:
+        snap = await _snapshot_many(session, [(key, GB, i + 1) for i, key in enumerate(keys)])
+        run = await build_plan(session, snapshot_id=snap, approved_by="test")
+        run_id = run.id
+        for i, key in enumerate(keys):
+            await _flag(
+                session,
+                key,
+                timedelta(days=30) if i == ready_index else timedelta(days=21, seconds=-1),
+            )
+        await save_profile_settings(
+            session, ProfileSettings(enforce_grace_period=True, grace_days=21)
+        )
+        await session.commit()
+
+    radarr = FakeRadarr(size_on_disk=GB)
+    gateway = _gateway(radarr={1: radarr})
+
+    async def advance_clock(*args: object, **kwargs: object) -> object:
+        monkeypatch.setattr("reaper.services.grace.utcnow", lambda: NOW + timedelta(seconds=2))
+        return gateway, []
+
+    build_gateway = AsyncMock(side_effect=advance_clock)
+    monkeypatch.setattr("reaper.api.runs.build_reap_gateway", build_gateway)
+    # launch_scan is synchronous; its scheduling is outside this deletion regression.
+    monkeypatch.setattr("reaper.api.runs.launch_scan", Mock())
+    app = FastAPI()
+    app.state.session_factory = async_factory
+    app.state.settings = Settings(
+        data_dir=tmp_path, secret_key="test", destructive_actions_enabled=True
+    )
+    app.state.secret_box = SecretBox("test")
+    request = Request({"type": "http", "app": app})
+    phrase = "REAP 0 SOULS 0 GB" if ready_index is None else "REAP 1 SOUL 1 GB"
+    status = await execute_run(request, run_id, ExecuteRunIn(confirmation_phrase=phrase))
+    assert status.total == (0 if ready_index is None else 1)
+    await app.state.reap_task
+
+    build_gateway.assert_awaited_once()
+    assert status.phase == "complete", status.error_reason
+    assert radarr.delete_calls == ([] if ready_index is None else [ready_index + 1])
+    assert status.deleted_items == (0 if ready_index is None else 1)
+    assert status.skipped == (2 if ready_index is None else 1)
+    async with async_factory() as session:
+        steps = (await session.scalars(select(ActionStep).where(ActionStep.run_id == run_id))).all()
+        assert {s.media_key for s in steps if s.state == StepState.VERIFIED} == (
+            set() if ready_index is None else {keys[ready_index]}
+        )
