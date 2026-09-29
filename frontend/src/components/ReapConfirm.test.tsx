@@ -63,6 +63,7 @@ function status(overrides: Partial<ReapStatus> = {}): ReapStatus {
     total: 0,
     deleted_items: 0,
     deleted_bytes: 0,
+    binned_bytes: 0,
     skipped: 0,
     title: "",
     error_reason: null,
@@ -94,6 +95,7 @@ beforeEach(() => {
   apiMock.run.mockResolvedValue(run); // only ever fetched after a 409 moves the phrase
   apiMock.dryRun.mockResolvedValue(report());
   apiMock.reapStatus.mockResolvedValue(status()); // idle until a reap starts
+  apiMock.runBins.mockResolvedValue({ bins: [] });
   apiMock.executeRun.mockResolvedValue(runningStatus);
   // The default trash is empty and fully readable, so the warning stays out of the way of
   // every test that is about something else. Tests that are about the warning set their own
@@ -381,6 +383,26 @@ describe("the execute gate", () => {
     expect(screen.getByText(moved.confirmation_phrase)).toBeInTheDocument();
     expect(screen.queryByText(run.confirmation_phrase)).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: /Reap 2 titles/ })).toBeInTheDocument();
+  });
+});
+
+describe("the recycle bins on the sheet", () => {
+  it("are read again when the plan's phrase moves", async () => {
+    const user = userEvent.setup();
+    apiMock.executeRun.mockRejectedValue(new ApiError(409, "The plan changed."));
+    apiMock.run.mockResolvedValue({
+      ...run,
+      item_count: 2,
+      confirmation_phrase: "REAP 2 SOULS 1 GB",
+    });
+    renderSheet();
+    await screen.findByText(/Practice run passed/);
+    await waitFor(() => expect(apiMock.runBins).toHaveBeenCalledTimes(1));
+
+    await fill(user, await screen.findByRole("textbox"), run.confirmation_phrase);
+    await user.click(screen.getByRole("button", { name: /^Reap$/ }));
+
+    await waitFor(() => expect(apiMock.runBins).toHaveBeenCalledTimes(2));
   });
 });
 

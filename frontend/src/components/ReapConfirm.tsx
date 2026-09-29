@@ -37,6 +37,7 @@ import { useSafety } from "../useSafety";
 import { composeError } from "../why";
 import { ModalShell } from "./ModalShell";
 import { PlexTrashNotice } from "./PlexTrashNotice";
+import { ConfirmBins } from "./RecycleBins";
 import { Notice } from "./Notice";
 
 export function ReapConfirm({
@@ -149,6 +150,7 @@ export function ReapConfirm({
     // items. A tick that survived that would be consent carried from a plan the operator
     // is no longer looking at.
     setTrashAcked(false);
+    void queryClient.invalidateQueries({ queryKey: ["run-bins", run.id] });
     dry.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.id, run.confirmation_phrase]);
@@ -279,6 +281,8 @@ export function ReapConfirm({
           onAck={setTrashAcked}
         />
       )}
+
+      {dryClean && !otherRunning && <ConfirmBins runId={run.id} />}
 
       {/* Stage 2: arm + typed confirmation, shown once the practice run is clean and no other
           run holds the slot. */}
