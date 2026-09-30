@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { applyAccent } from "./accent";
-import { Announcer, useSlowWait } from "./announce";
-import { api, type AuthUser, type Verdict } from "./api";
+import { Announcer, announce, useSlowWait } from "./announce";
+import { api, ApiError, type AuthUser, type Verdict } from "./api";
 import { BackNavProvider, useBackGuard, useBackNav, useModalOpen } from "./backnav";
 import { Login } from "./components/Login";
 import { NotInScanPanel } from "./components/NotInScanPanel";
@@ -378,11 +378,37 @@ function Dashboard({ user }: { user: AuthUser }) {
     enabled: selectedId !== null,
   });
 
-  const { data: groupDetail, isError: groupError } = useQuery({
+  const {
+    data: groupDetail,
+    error: groupErr,
+    isFetching: groupFetching,
+  } = useQuery({
     queryKey: ["group", selectedGroupKey],
     queryFn: () => api.group(selectedGroupKey!),
     enabled: selectedGroupKey !== null,
   });
+
+  // A title the newest scan no longer holds closes its panel. Any other failure keeps the
+  // panel and its last data.
+  const groupError = groupErr !== null;
+  // Read only once the refetch has settled: a show that came back still carries the old
+  // error in the cache until its new answer lands.
+  const groupGone =
+    !groupFetching &&
+    groupErr instanceof ApiError &&
+    groupErr.code === "error.review.show_not_in_scan";
+  const itemGone = detail?.in_latest_scan === false;
+  useEffect(() => {
+    if (!groupGone && !itemGone) return;
+    setSelected(null);
+    announce(t("reviewQueue.announce.panelGone"));
+    // The closed panel held focus, or the card that opened it is gone. Land on the queue's
+    // heading instead of the page body.
+    setTimeout(() => {
+      if (document.activeElement === document.body)
+        document.querySelector<HTMLElement>("main h2")?.focus();
+    }, 0);
+  }, [groupGone, itemGone, t]);
 
   const { data: personDetail, isError: personError } = useQuery({
     queryKey: ["fairness", "person", scalesUser],
@@ -533,7 +559,7 @@ function Dashboard({ user }: { user: AuthUser }) {
                 latestScanSnapshotId={scanStatus?.snapshot_id ?? null}
               />
               {selectedId !== null &&
-                (detail ? (
+                (detail && !itemGone ? (
                   <WhyPanel
                     item={detail}
                     onClose={() => setSelected(null)}
@@ -553,7 +579,7 @@ function Dashboard({ user }: { user: AuthUser }) {
                   <WhyPanelFallback error={detailError} onClose={() => setSelected(null)} />
                 ))}
               {selectedGroupKey !== null &&
-                (groupDetail ? (
+                (groupDetail && !groupGone ? (
                   <ShowPanel
                     group={groupDetail}
                     // This one does carry a lane: the panel lists every season a show has,
