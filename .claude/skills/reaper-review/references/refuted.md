@@ -365,6 +365,8 @@ The two sections after the index are **not** refutations. Read their headings be
 | `src/reaper/clients/plex.py:library_guid_index` — dropping-a-sibling-narrows-an-ambiguous-title | A dropped key takes the same path in `library_index.build_index` as a key absent from the listing (retired, never admitted), and plays are read by rating key. So a truly deleted sibling gives the same match this scan as on the next one. Only a false 404 for a live row would differ, and none is known. | `7ca0893b` |
 | `src/reaper/services/library_index.py:build_index` — scan-again-sentence-claims-an-unverified-cause | The sentence fires only when the sweep succeeded (`swept` true), because retirement needs it. A failed or unconfigured sweep gets its own message and retires nothing. The sweep and the spine walk the same sections, so an in-scope section is never unwalked when this sentence shows. | `60bd2cd2` |
 | `tests/test_review_scan.py:refresh tests` — refresh-branches-untested | This names no trigger. Its one concrete case, an empty refresh, was fixed and pinned as its own finding. | `60bd2cd2` |
+| `frontend/src/components/ReapBar.tsx:ReapBar` — errored-bar-hides-the-wait-line | The `waitingForPlex` line renders outside the `!errored` guard, so a red bar after a failed reap that deleted files still shows why scans are paused. Only the amber tint is lost. | `30fd2c37` |
+| `frontend/src/locales/en/ui.json:error.scan.waiting_for_plex` — key-out-of-alphabetical-order | No test or tool requires sorted keys in ui.json, and the i18n tests compare key sets only. | `30fd2c37` |
 
 ## Carried over with NO evidence — unverified, not refuted
 
