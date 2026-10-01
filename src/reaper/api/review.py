@@ -1705,7 +1705,9 @@ async def groups(
         grace_profile = await active_profile(session)
         out: list[GroupOut] = []
         for group_key in dict.fromkeys(key):
-            group = await _group_out(session, snapshot.id, group_key, decisions, expiries, grace_profile)
+            group = await _group_out(
+                session, snapshot.id, group_key, decisions, expiries, grace_profile
+            )
             if group is not None:
                 out.append(group)
         return out
