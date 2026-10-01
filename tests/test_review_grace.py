@@ -10,7 +10,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from reaper.api.review import candidate_detail, group_detail, list_candidates
+from reaper.api.review import candidate_detail, groups, list_candidates
 from reaper.api.schemas import CandidateOut, GroupSeasonMarkOut
 from reaper.db.models import Candidate, FirstFlagged, Profile
 from reaper.engine.policy import ProfileSettings
@@ -56,7 +56,7 @@ async def test_review_surfaces_share_the_gate_deadline(
         SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(session_factory=async_factory))),
     )
     page = await list_candidates(request, limit=100, offset=0)
-    group = await group_detail(request, "sonarr:1:1")
+    (group,) = await groups(request, ["sonarr:1:1"])
     detail = await candidate_detail(request, candidate_id)
     assert page.total == 1  # Waiting items stay in Review.
     surfaces: list[CandidateOut | GroupSeasonMarkOut] = [

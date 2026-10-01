@@ -8,7 +8,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReapStatus } from "../api";
 import { expectNoA11yViolations } from "../test/a11y";
-import { DEFAULT_UPDATE, IDLE_SCAN } from "../test/apiFixtures";
+import { DEFAULT_PROFILE, DEFAULT_UPDATE, IDLE_SCAN, seedSettings } from "../test/apiFixtures";
 import { testQueryClient } from "../test/queryClient";
 import { renderWithProviders } from "../test/renderWithProviders";
 import { ReapBar } from "./ReapBar";
@@ -60,6 +60,7 @@ const JOBS = {
 beforeEach(() => {
   vi.clearAllMocks();
   apiMock.about.mockResolvedValue(null);
+  apiMock.profile.mockResolvedValue(DEFAULT_PROFILE);
   apiMock.update.mockResolvedValue(DEFAULT_UPDATE);
   apiMock.safety.mockResolvedValue({ destructive_enabled: false, dry_run: true, reason: null });
   apiMock.latestSnapshot.mockResolvedValue(null);
@@ -122,7 +123,9 @@ describe("Settings, Jobs while Plex catches up", () => {
   it("turns off the scan and the shelf update and leaves the other jobs on", async () => {
     apiMock.scanStatus.mockResolvedValue(WAITING);
 
-    renderWithProviders(<Settings panel="jobs" onPanelChange={() => {}} />);
+    renderWithProviders(<Settings panel="jobs" onPanelChange={() => {}} />, {
+      client: seedSettings(testQueryClient()),
+    });
 
     expect(await screen.findByText(/Jobs that read Plex wait until it's done/)).toBeInTheDocument();
     const rowOf = (title: string) => {
@@ -147,7 +150,9 @@ describe("Settings, Jobs while Plex catches up", () => {
   it("shows no notice and keeps both buttons on when Plex is not being waited for", async () => {
     apiMock.scanStatus.mockResolvedValue(IDLE_SCAN);
 
-    renderWithProviders(<Settings panel="jobs" onPanelChange={() => {}} />);
+    renderWithProviders(<Settings panel="jobs" onPanelChange={() => {}} />, {
+      client: seedSettings(testQueryClient()),
+    });
 
     const shelf = (await screen.findByText("Update Leaving Soon shelf")).closest(".jobrow");
     await waitFor(() => expect(shelf?.querySelector(".slot-act button")).toBeEnabled());
