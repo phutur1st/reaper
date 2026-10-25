@@ -692,6 +692,7 @@ async def list_candidates(
                     Candidate.group_key.in_(group_keys),  # Bounded by the 500-row page.
                 )
             ):
+                assert group_key is not None  # the IN filter above never matches NULL
                 matching_keys.setdefault(group_key, []).append(media_key)
 
         return CandidatePageOut(
